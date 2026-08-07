@@ -37,10 +37,10 @@
 <div ref="{{ rootRef }}" style="position:relative;width:100%;font-family:'Jost',ui-sans-serif,system-ui,sans-serif;font-weight:300;color:#f6f2ec;overflow-x:hidden">
 
   <div data-stage="" style="position:fixed;inset:0;z-index:0;background:#1c1c1e;overflow:hidden">
-    <video ref="{{ videoRef }}" muted="" playsinline="" preload="auto" disablepictureinpicture="" aria-hidden="true" style="position:absolute;top:50%;left:50%;width:104%;height:104%;transform:translate(-50%,-50%);object-fit:cover;will-change:transform"></video>
-    <div data-vignette="" aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,rgba(28,28,30,0) 35%,rgba(28,28,30,.62) 82%,rgba(28,28,30,.92) 100%)"></div>
+    <video ref="{{ videoRef }}" muted="" playsinline="" preload="auto" poster="media/droplet-poster.jpg" disablepictureinpicture="" aria-hidden="true" style="position:absolute;top:50%;left:50%;width:104%;height:104%;transform:translate(-50%,-50%);object-fit:cover;will-change:transform;backface-visibility:hidden"></video>
+    <div data-vignette="" aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,rgba(28,28,30,0) 35%,rgba(28,28,30,.62) 82%,rgba(28,28,30,.92) 100%);will-change:opacity"></div>
     <div aria-hidden="true" style="position:absolute;inset:0;background:linear-gradient(100deg,rgba(28,28,30,.8) 0%,rgba(28,28,30,.56) 34%,rgba(28,28,30,.12) 62%,rgba(28,28,30,0) 82%)"></div>
-    <div data-tint="" aria-hidden="true" style="position:absolute;inset:0;background:#b07a46;opacity:.1;mix-blend-mode:soft-light"></div>
+    <div data-tint="" aria-hidden="true" style="position:absolute;inset:0;background:#b07a46;opacity:.1;mix-blend-mode:soft-light;will-change:opacity"></div>
   </div>
 
   <div ref="{{ loaderRef }}" style="position:fixed;inset:0;z-index:60;background:#1c1c1e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:22px;transition:opacity .9s cubic-bezier(.22,.61,.36,1)">
@@ -212,8 +212,8 @@
         </div>
         <h1 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(30px,5vw,58px);line-height:1.04">Reconstruction archive — Aura, The Perfume</h1>
         <dl style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;border-top:1px solid rgba(224,189,174,.2);border-bottom:1px solid rgba(224,189,174,.2);padding:18px 0">
-          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">SOURCE FILM</dt><dd style="margin:6px 0 0;font-size:12px">droplet-60fps.mp4</dd></div>
-          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PATH</dt><dd style="margin:6px 0 0;font-size:12px">/media/droplet-60fps.mp4</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">SOURCE FILM</dt><dd style="margin:6px 0 0;font-size:12px">droplet-scrub.mp4 · 1280×720 · 30 fps · GOP 6</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PATH</dt><dd style="margin:6px 0 0;font-size:12px">/media/droplet-scrub.mp4</dd></div>
           <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PALETTE</dt><dd style="margin:6px 0 0;font-size:12px">#1c1c1e · #b07a46 · #e0bdae · #f6f2ec</dd></div>
         </dl>
         <pre ref="{{ promptRef }}" style="margin:0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.8;color:rgba(246,242,236,.78);background:rgba(224,189,174,.05);border:1px solid rgba(224,189,174,.16);border-radius:16px;padding:clamp(16px,3vw,30px)">{{ promptText }}</pre>
@@ -225,9 +225,15 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
 /* Scroll-video engine constants */
+const FILM_SRC = 'media/droplet-scrub.mp4'; // 720p30, GOP 6, no audio — encoded for seeking, not playback
 const DAMP_PER_SEC = 7.2;        // exponential damping rate for the internal playhead
-const SEEK_EPSILON = 0.033;      // seconds (~one frame); below this we do not issue a new seek
+const SEEK_EPSILON = 0.034;      // seconds (~one frame at 30fps); below this we do not issue a new seek
+const SEEK_WATCHDOG_MS = 400;    // if `seeked` never arrives, release the lock rather than deadlock
+const SNAP_AFTER_S = 0.12;       // a gap this long (tab restore, long task) snaps instead of easing
 const TOUR_BASE_MS = 20000;      // 1x tour duration for the whole page
+const IDLE_FRAMES = 20;          // frames with nothing to do before the rAF loop parks itself
+const TINT_STEPS = 48;           // the tint sits under mix-blend-mode; quantise its repaints
+const TENSION_SAMPLES = 128;     // precomputed points along the SVG tension trace
 
 class Component extends DCLogic {
   state = { note: 0, tour: 'idle', speed: 1, pct: 0, promptOpen: false, copied: false };
@@ -271,7 +277,7 @@ class Component extends DCLogic {
   promptText = [
     'RECONSTRUCTION PROMPT — INTIA / AURA, THE PERFUME',
     '',
-    'SOURCE FILM: droplet-60fps.mp4 (served at /media/droplet-60fps.mp4). Continuous cinematic macro:',
+    'SOURCE FILM: droplet-scrub.mp4 (served at /media/droplet-scrub.mp4). Continuous cinematic macro:',
     'push toward the polished frosted-glass lip of a perfume flacon, an amber droplet elongates',
     'and releases, camera passes through the surface-tension membrane into the falling liquid,',
     'travels among marbling colour ribbons (fast pistachio-almond threads leading, coiling',
@@ -307,15 +313,25 @@ class Component extends DCLogic {
     '             weight and swaps the composition copy (the interactive element).',
     '  05 GLOW    commercial close: 50 ml / €25, wear counter, CTA, regulatory block, return.',
     '',
+    'SOURCE ENCODE — the film is cut for seeking, not for playback. 1280x720, 30 fps, H.264 high,',
+    'CRF 23, closed GOP of 6 frames (keyint = keyint_min = 6, sc_threshold 0, no B-frames), audio',
+    'stripped, moov atom at the front (+faststart). Scrubbing decodes from the nearest keyframe,',
+    'so GOP length — not frame rate — sets the cost of a seek: 5 P-frames of 720p instead of a',
+    '2-3 second 1080p60 GOP. A poster frame paints before the film arrives.',
+    '',
     'SCROLL VIDEO ENGINE — native <video>, fixed full-viewport, object-fit cover, muted,',
     'playsInline, preload auto, disablePictureInPicture. Duration read from loadedmetadata,',
-    'never hardcoded. Document progress sets a TARGET time only; one rAF loop eases an internal',
-    'playhead toward it with frame-rate-independent exponential damping (rate 7.2/s). Never seek',
-    'while the decoder is seeking — keep only the newest target and drain it on `seeked`; no',
-    'unbounded queue, no stale value moving the film backward; seek epsilon one frame;',
-    'requestVideoFrameCallback used where available. The whole file is buffered into a blob URL',
-    'first because the served stream reports an empty seekable range. Restrained loading overlay',
-    'with a buffered progress bar, desktop-only pointer parallax, graceful error handling,',
+    'never hardcoded. Document progress sets a TARGET time only; ONE rAF loop eases an internal',
+    'playhead toward it with frame-rate-independent exponential damping (rate 7.2/s) and parks',
+    'itself once nothing is moving. Scroll, resize and pointer events only wake that loop — they',
+    'never run a frame synchronously, which would force layout inside the event and let the tour',
+    'feed its own scrollTo back into itself. Never seek while the decoder is seeking — exactly one',
+    'seek in flight, newest target wins, released by `seeked` or requestVideoFrameCallback under a',
+    'token so superseded callbacks cannot double-release, with a watchdog against a lost event.',
+    'Seek epsilon one frame. The element streams directly when the host honours byte ranges; only',
+    'if `seekable` comes back empty is the file pulled into a blob URL. Reads are batched into',
+    'measure(); paint() is write-only and skips unchanged values. Restrained loading overlay with',
+    'a buffered progress bar, desktop-only pointer parallax, graceful error handling,',
     'reduced-motion respected.',
     '',
     'AUTO TOUR — fixed pill control, bottom centre: Start Tour -> Pause -> Resume -> Replay, live',
@@ -336,61 +352,12 @@ class Component extends DCLogic {
     window.__om = this;
 
     this.mounted = true;
-    this.playhead = 0; this.target = 0; this.seeking = false; this.pending = null;
-    this.duration = 0; this.progress = 0; this.pointer = { x: 0, y: 0 };
+    this.playhead = 0; this.target = 0; this.seeking = false; this.pending = null; this.seekToken = 0;
+    this.duration = 0; this.progress = -1; this.pointer = { x: 0, y: 0 };
+    this.running = false; this.idle = 0; this.needMeasure = false;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.touch = window.matchMedia('(hover: none)').matches;
-
-    const v = this.videoRef.current;
-    if (v) {
-      this.onMeta = () => { this.duration = v.duration || 0; this.hideLoader(); };
-      this.onSeeked = () => {
-        this.seeking = false;
-        if (this.pending != null) { const t = this.pending; this.pending = null; this.doSeek(t); }
-      };
-      this.onProgress = () => {
-        if (!this.blobUrl) return;
-        try {
-          if (v.buffered.length && v.duration) {
-            const p = v.buffered.end(v.buffered.length - 1) / v.duration;
-            if (this.bufferRef.current) this.bufferRef.current.style.right = (100 - p * 100) + '%';
-          }
-        } catch (e) { /* buffered may throw before metadata */ }
-      };
-      this.onError = () => { if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM UNAVAILABLE — INTERFACE STILL NAVIGABLE'; setTimeout(() => this.hideLoader(), 1200); };
-      v.addEventListener('loadedmetadata', this.onMeta);
-      v.addEventListener('seeked', this.onSeeked);
-      v.addEventListener('progress', this.onProgress);
-      v.addEventListener('error', this.onError);
-      if (v.readyState >= 1) this.onMeta();
-      this.loaderTimeout = setTimeout(() => this.hideLoader(), 12000);
-      this.loadBlob(v);
-    }
-
-    this.onScroll = () => {
-      this.dirty = true;
-      if (performance.now() - (this.lastFrameAt || 0) > 24) {
-        try { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.loop); this.frame(performance.now()); } catch (e) {}
-      }
-    };
-    this.onPointer = (e) => {
-      if (this.touch || this.reduced) return;
-      this.pointer.x = (e.clientX / window.innerWidth - .5);
-      this.pointer.y = (e.clientY / window.innerHeight - .5);
-    };
-    this.onUserScroll = () => this.pauseTour();
-    this.onKey = (e) => {
-      if (e.key === 'Escape') { this.stopTour(); return; }
-      if (['PageUp', 'PageDown', 'Home', 'End', ' ', 'ArrowUp', 'ArrowDown'].indexOf(e.key) > -1) this.pauseTour();
-    };
-    this.onVis = () => { if (!document.hidden) { this.last = performance.now(); this.onScroll(); } };
-    document.addEventListener('visibilitychange', this.onVis);
-    window.addEventListener('scroll', this.onScroll, { passive: true });
-    window.addEventListener('resize', this.onScroll);
-    window.addEventListener('mousemove', this.onPointer, { passive: true });
-    window.addEventListener('wheel', this.onUserScroll, { passive: true });
-    window.addEventListener('touchstart', this.onUserScroll, { passive: true });
-    window.addEventListener('keydown', this.onKey);
+    this.loop = this.loop.bind(this);
 
     this.sections = Array.prototype.slice.call(document.querySelectorAll('[data-chapter]'));
     this.navItems = Array.prototype.slice.call(document.querySelectorAll('[data-navitem]'));
@@ -401,43 +368,121 @@ class Component extends DCLogic {
       this.tensionLen = this.tension.getTotalLength();
       this.tension.style.strokeDasharray = this.tensionLen;
       this.tension.style.strokeDashoffset = this.tensionLen;
-    }
-    this.last = performance.now();
-    this.dirty = true;
-    this.loop = this.loop.bind(this);
-    this.raf = requestAnimationFrame(this.loop);
-    this.tick = setInterval(() => {
-      if (!this.mounted) return;
-      if (performance.now() - (this.lastFrameAt || 0) > 40) {
-        try { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.loop); this.frame(performance.now()); } catch (e) {}
+      // Sample the trace once; getPointAtLength per frame is geometry work we do not need to repeat.
+      this.tensionPts = [];
+      for (let i = 0; i <= TENSION_SAMPLES; i++) {
+        const pt = this.tension.getPointAtLength(this.tensionLen * (i / TENSION_SAMPLES));
+        this.tensionPts.push([pt.x, pt.y]);
       }
-    }, 33);
+    }
+    this.measure();
+
+    const v = this.videoRef.current;
+    if (v) {
+      this.onMeta = () => {
+        const el = this.videoRef.current;
+        if (!el) return;
+        this.duration = el.duration || 0;
+        // If the host honours byte ranges the element can seek natively and we are done.
+        // If it does not, `seekable` comes back empty (or short) and scrubbing is impossible —
+        // only then do we pay for pulling the whole file into a blob.
+        let seekable = false;
+        try { seekable = !!(el.seekable && el.seekable.length && el.seekable.end(el.seekable.length - 1) >= this.duration - 0.5); } catch (e) {}
+        if (seekable || this.blobUrl) { this.hideLoader(); this.wake(); }
+        else this.bufferFilm(el);
+      };
+      this.onSeeked = () => this.endSeek(this.seekToken);
+      this.onProgress = () => {
+        if (this.buffering) return; // the fetch loop owns the bar while it runs
+        const el = this.videoRef.current;
+        try {
+          if (el && el.buffered.length && el.duration) this.setBuffer(el.buffered.end(el.buffered.length - 1) / el.duration);
+        } catch (e) { /* buffered may throw before metadata */ }
+      };
+      this.onError = () => { if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM UNAVAILABLE — INTERFACE STILL NAVIGABLE'; setTimeout(() => this.hideLoader(), 1200); };
+      v.addEventListener('loadedmetadata', this.onMeta);
+      v.addEventListener('seeked', this.onSeeked);
+      v.addEventListener('progress', this.onProgress);
+      v.addEventListener('error', this.onError);
+      this.loaderTimeout = setTimeout(() => this.hideLoader(), 12000);
+      v.src = FILM_SRC;
+      v.load();
+      if (v.readyState >= 1) this.onMeta();
+    }
+
+    // Scroll only wakes the loop. It never runs a frame synchronously: doing that from the
+    // scroll handler forces layout mid-event and, during the tour, feeds scrollTo back into
+    // itself — which is what buried the decoder in seeks.
+    this.onScroll = () => this.wake();
+    this.onResize = () => { this.needMeasure = true; this.wake(); };
+    this.onPointer = (e) => {
+      if (this.touch || this.reduced) return;
+      this.pointer.x = (e.clientX / this.vw - .5);
+      this.pointer.y = (e.clientY / this.vh - .5);
+      this.wake();
+    };
+    this.onUserScroll = () => this.pauseTour();
+    this.onKey = (e) => {
+      if (e.key === 'Escape') { this.stopTour(); return; }
+      if (['PageUp', 'PageDown', 'Home', 'End', ' ', 'ArrowUp', 'ArrowDown'].indexOf(e.key) > -1) this.pauseTour();
+    };
+    this.onVis = () => {
+      if (document.hidden) { this.running = false; cancelAnimationFrame(this.raf); }
+      else { this.needMeasure = true; this.wake(); }
+    };
+    document.addEventListener('visibilitychange', this.onVis);
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+    window.addEventListener('resize', this.onResize);
+    window.addEventListener('mousemove', this.onPointer, { passive: true });
+    window.addEventListener('wheel', this.onUserScroll, { passive: true });
+    window.addEventListener('touchstart', this.onUserScroll, { passive: true });
+    window.addEventListener('keydown', this.onKey);
+    // Document height also moves when webfonts swap in or a chapter reflows, not just on resize.
+    if (window.ResizeObserver) {
+      this.ro = new ResizeObserver(() => { this.needMeasure = true; this.wake(); });
+      this.ro.observe(document.documentElement);
+    }
+
+    this.wake();
   }
 
   componentWillUnmount() {
     this.mounted = false;
+    this.running = false;
     cancelAnimationFrame(this.raf);
-    clearInterval(this.tick);
     clearTimeout(this.loaderTimeout);
+    clearTimeout(this.seekWatchdog);
+    if (this.ro) { this.ro.disconnect(); this.ro = null; }
     const v = this.videoRef.current;
     if (v) {
       v.removeEventListener('loadedmetadata', this.onMeta);
       v.removeEventListener('seeked', this.onSeeked);
       v.removeEventListener('progress', this.onProgress);
       v.removeEventListener('error', this.onError);
+      v.removeAttribute('src');
+      v.load();
     }
+    if (this.blobUrl) { URL.revokeObjectURL(this.blobUrl); this.blobUrl = null; }
     document.removeEventListener('visibilitychange', this.onVis);
     window.removeEventListener('scroll', this.onScroll);
-    window.removeEventListener('resize', this.onScroll);
+    window.removeEventListener('resize', this.onResize);
     window.removeEventListener('mousemove', this.onPointer);
     window.removeEventListener('wheel', this.onUserScroll);
     window.removeEventListener('touchstart', this.onUserScroll);
     window.removeEventListener('keydown', this.onKey);
   }
 
-  async loadBlob(v) {
+  /* ---------- film loading ---------- */
+  setBuffer(f) {
+    const b = this.bufferRef.current;
+    if (b) b.style.right = (100 - Math.max(0, Math.min(1, f)) * 100).toFixed(1) + '%';
+  }
+
+  async bufferFilm(v) {
+    if (this.buffering) return;
+    this.buffering = true;
     try {
-      const res = await fetch('media/droplet-60fps.mp4');
+      const res = await fetch(FILM_SRC);
       if (!res.ok) throw new Error('fetch failed');
       const total = Number(res.headers.get('content-length')) || 0;
       const reader = res.body && res.body.getReader ? res.body.getReader() : null;
@@ -448,7 +493,7 @@ class Component extends DCLogic {
           const { done, value } = await reader.read();
           if (done) break;
           chunks.push(value); got += value.length;
-          if (total && this.bufferRef.current) this.bufferRef.current.style.right = (100 - (got / total) * 100).toFixed(1) + '%';
+          if (total) this.setBuffer(got / total);
         }
         blob = new Blob(chunks, { type: 'video/mp4' });
       } else {
@@ -456,15 +501,17 @@ class Component extends DCLogic {
       }
       if (!this.mounted) return;
       this.blobUrl = URL.createObjectURL(blob);
-      if (this.bufferRef.current) this.bufferRef.current.style.right = '0%';
+      this.setBuffer(1);
+      const at = v.currentTime;
       v.src = this.blobUrl;
       v.load();
+      const resume = () => { v.removeEventListener('loadedmetadata', resume); try { v.currentTime = at; } catch (e) {} this.wake(); };
+      v.addEventListener('loadedmetadata', resume);
     } catch (e) {
       if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM STREAMING — SCRUB LIMITED';
-      v.src = 'media/droplet-60fps.mp4';
-      v.load();
     } finally {
-      setTimeout(() => this.hideLoader(), 400);
+      this.buffering = false;
+      this.hideLoader();
     }
   }
 
@@ -473,89 +520,140 @@ class Component extends DCLogic {
     if (l && l.style.opacity !== '0') { l.style.opacity = '0'; setTimeout(() => { if (l) l.style.pointerEvents = 'none'; }, 900); }
   }
 
+  /* ---------- seek pump: exactly one seek in flight, newest target always wins ---------- */
   doSeek(t) {
     const v = this.videoRef.current;
     if (!v || !this.duration) return;
     const clamped = Math.max(0, Math.min(this.duration - 0.02, t));
-    if (Math.abs(clamped - v.currentTime) < SEEK_EPSILON) return;
     if (this.seeking) { this.pending = clamped; return; }
+    if (Math.abs(clamped - v.currentTime) < SEEK_EPSILON) return;
+
     this.seeking = true;
-    try { v.currentTime = clamped; } catch (e) { this.seeking = false; }
-    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => { this.seeking = false; if (this.pending != null) { const p = this.pending; this.pending = null; this.doSeek(p); } });
+    const token = ++this.seekToken;
+    clearTimeout(this.seekWatchdog);
+    this.seekWatchdog = setTimeout(() => this.endSeek(token), SEEK_WATCHDOG_MS);
+    try { v.currentTime = clamped; } catch (e) { this.endSeek(token); return; }
+    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => this.endSeek(token));
+  }
+
+  endSeek(token) {
+    if (!this.seeking || token !== this.seekToken) return; // stale callback from a superseded seek
+    this.seeking = false;
+    clearTimeout(this.seekWatchdog);
+    if (this.pending != null) { const q = this.pending; this.pending = null; this.doSeek(q); }
+    this.wake();
+  }
+
+  /* ---------- frame driver: one rAF chain, parks itself when nothing is moving ---------- */
+  measure() {
+    this.vw = window.innerWidth;
+    this.vh = window.innerHeight;
+    this.scrollMax = Math.max(1, document.documentElement.scrollHeight - this.vh);
+    if (this.sections) this.metrics = this.sections.map(el => ({ top: el.offsetTop, h: el.offsetHeight }));
+    const rail = this.meniscusRef.current && this.meniscusRef.current.parentElement;
+    this.railH = rail ? rail.clientHeight - 9 : 0;
+  }
+
+  wake() {
+    this.idle = 0;
+    if (this.running || !this.mounted || document.hidden) return;
+    this.running = true;
+    this.last = performance.now();
+    this.raf = requestAnimationFrame(this.loop);
   }
 
   loop(now) {
-    if (!this.mounted) return;
-    this.raf = requestAnimationFrame(this.loop);
+    if (!this.mounted) { this.running = false; return; }
     try { this.frame(now); } catch (e) { /* never break the rAF chain */ }
+    if (this.idle >= IDLE_FRAMES && !this.tourActive) { this.running = false; return; }
+    this.raf = requestAnimationFrame(this.loop);
   }
 
   frame(now) {
-    this.lastFrameAt = performance.now();
-    const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now;
-    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-    const p = Math.max(0, Math.min(1, window.scrollY / max));
+    const raw = Math.max(0, (now - this.last) / 1000); this.last = now;
+    const dt = Math.min(0.05, raw);
+    if (this.needMeasure) { this.needMeasure = false; this.measure(); }
+
+    const sy = window.scrollY;                            // the only forced layout read per frame
+    const p = Math.max(0, Math.min(1, sy / this.scrollMax));
+    let busy = p !== this.progress;
     this.progress = p;
 
-    const vid = this.videoRef.current;
-    if (vid) {
-      if (!this.duration && vid.duration) this.duration = vid.duration;
-      if (this.seeking && !vid.seeking) { this.seeking = false; this.pending = null; }
-    }
     if (this.duration) {
       this.target = p * this.duration;
-      const k = 1 - Math.exp(-DAMP_PER_SEC * dt);
-      this.playhead += (this.target - this.playhead) * (dt > 0.12 ? 1 : k);
+      // A long gap (tab restore, blocking task) snaps rather than easing through 8 s of film.
+      const k = raw > SNAP_AFTER_S ? 1 : 1 - Math.exp(-DAMP_PER_SEC * dt);
+      this.playhead += (this.target - this.playhead) * k;
+      if (Math.abs(this.target - this.playhead) < SEEK_EPSILON * 0.5) this.playhead = this.target;
+      else busy = true;
       this.doSeek(this.playhead);
     }
-    this.paint(p, dt);
+
+    this.paint(p, sy);
+    if (this.tourActive) { this.driveTour(); busy = true; }
+
+    this.idle = busy ? 0 : this.idle + 1;
   }
 
-  paint(p, dt) {
+  /* Write-only pass. Every geometry value it needs was read in measure() or passed in,
+     so nothing here interleaves a read with a write and forces synchronous layout. */
+  paint(p, sy) {
+    const vh = this.vh;
+
     const v = this.videoRef.current;
     if (v) {
       const px = (this.touch || this.reduced) ? 0 : this.pointer.x * -16;
       const py = (this.touch || this.reduced) ? 0 : this.pointer.y * -12;
       const scale = 1.1 - 0.08 * p;
-      v.style.transform = 'translate(calc(-50% + ' + px.toFixed(2) + 'px), calc(-50% + ' + py.toFixed(2) + 'px)) scale(' + scale.toFixed(4) + ')';
+      const tr = 'translate(calc(-50% + ' + px.toFixed(1) + 'px), calc(-50% + ' + py.toFixed(1) + 'px)) scale(' + scale.toFixed(4) + ')';
+      if (tr !== this.lastVideoTr) { this.lastVideoTr = tr; v.style.transform = tr; }
     }
     if (this.tint) {
-      // pearl -> sand -> gourmand -> rose gold -> ivory
-      const stops = [[229,222,226], [222,208,189], [176,122,70], [176,122,70], [224,189,174], [246,242,236]];
-      const f = p * (stops.length - 1), i0 = Math.min(stops.length - 1, Math.floor(f)), i1 = Math.min(stops.length - 1, i0 + 1), t = f - i0;
-      const c = stops[i0].map((s, k) => Math.round(s + (stops[i1][k] - s) * t));
-      const op = (0.1 + 0.1 * Math.sin(p * Math.PI)).toFixed(3);
-      if (!this.lastTintC || this.lastTintC[0] !== c[0] || this.lastTintC[1] !== c[1] || this.lastTintC[2] !== c[2]) {
-        this.lastTintC = c;
+      // pearl -> sand -> gourmand -> rose gold -> ivory. The layer sits under mix-blend-mode:
+      // soft-light, so a background change repaints and re-blends the whole viewport. Quantise
+      // it to TINT_STEPS; opacity carries the fine motion and stays on the compositor.
+      const step = Math.round(p * TINT_STEPS);
+      if (step !== this.lastTintStep) {
+        this.lastTintStep = step;
+        const stops = [[229,222,226], [222,208,189], [176,122,70], [176,122,70], [224,189,174], [246,242,236]];
+        const f = (step / TINT_STEPS) * (stops.length - 1), i0 = Math.min(stops.length - 2, Math.floor(f)), t = f - i0;
+        const c = stops[i0].map((s, k) => Math.round(s + (stops[i0 + 1][k] - s) * t));
         this.tint.style.background = 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
       }
+      const op = (0.1 + 0.1 * Math.sin(p * Math.PI)).toFixed(3);
       if (this.lastTintOp !== op) { this.lastTintOp = op; this.tint.style.opacity = op; }
     }
-    if (this.vignette) this.vignette.style.opacity = (0.55 + 0.45 * Math.abs(Math.cos(p * Math.PI))).toFixed(3);
-    if (!this.metrics || this.metricsW !== window.innerWidth || this.metricsH !== window.innerHeight) {
-      this.metricsW = window.innerWidth; this.metricsH = window.innerHeight;
-      this.metrics = this.sections.map(el => ({ top: el.offsetTop, h: el.offsetHeight }));
+    if (this.vignette) {
+      const vo = (0.55 + 0.45 * Math.abs(Math.cos(p * Math.PI))).toFixed(3);
+      if (this.lastVigOp !== vo) { this.lastVigOp = vo; this.vignette.style.opacity = vo; }
     }
+
     const n = this.sections.length;
-    const sy = window.scrollY, vh = window.innerHeight;
+    if (!this.lastO || this.lastO.length !== n) {
+      this.lastO = new Array(n).fill(-1);
+      this.lastWC = new Array(n).fill('');
+      this.lastPE = new Array(n).fill('');
+    }
     for (let i = 0; i < n; i++) {
-      const el = this.sections[i], m = this.metrics[i];
+      const m = this.metrics[i];
       const center = m.top + m.h / 2 - sy;
       const d = Math.abs(center - vh / 2) / vh;
       const o = Math.max(0, Math.min(1, 1.25 - d * 1.9));
-      if (!this.lastO || this.lastO.length !== n) this.lastO = new Array(n).fill(-1);
       if (Math.abs(this.lastO[i] - o) < 0.004) continue;
       this.lastO[i] = o;
+      const el = this.sections[i];
       el.style.opacity = o.toFixed(3);
       const dir = center > vh / 2 ? 1 : -1;
       el.style.transform = 'translate3d(0,' + (dir * (1 - o) * 46).toFixed(1) + 'px,0) scale(' + (0.985 + o * 0.015).toFixed(4) + ')';
-      el.style.willChange = o > 0 && o < 1 ? 'transform,opacity' : 'auto';
-      el.style.pointerEvents = o > 0.6 ? 'auto' : 'none';
+      // will-change churns layers if written every frame; only touch it when the band changes.
+      const wc = (o > 0 && o < 1) ? 'transform,opacity' : 'auto';
+      if (wc !== this.lastWC[i]) { this.lastWC[i] = wc; el.style.willChange = wc; }
+      const pe = o > 0.6 ? 'auto' : 'none';
+      if (pe !== this.lastPE[i]) { this.lastPE[i] = pe; el.style.pointerEvents = pe; }
     }
     if (this.meniscusRef.current) {
-      const rail = this.meniscusRef.current.parentElement;
-      const h = rail ? rail.clientHeight - 9 : 0;
-      this.meniscusRef.current.style.transform = 'translateY(' + (p * h).toFixed(1) + 'px)';
+      const my = (p * this.railH).toFixed(1);
+      if (my !== this.lastMeniscus) { this.lastMeniscus = my; this.meniscusRef.current.style.transform = 'translateY(' + my + 'px)'; }
     }
     const active = Math.min(this.chapterList.length - 1, Math.floor(p * this.chapterList.length + 0.15));
     if (active !== this.lastActiveNav) {
@@ -563,18 +661,19 @@ class Component extends DCLogic {
       for (let i = 0; i < this.navItems.length; i++) this.navItems[i].style.color = i === active ? '#f6f2ec' : 'rgba(246,242,236,.42)';
     }
 
-    const dose = this.doseRef.current && this.doseRef.current.querySelector('[data-dose]');
-    if (dose) {
+    if (!this.doseEl && this.doseRef.current) this.doseEl = this.doseRef.current.querySelector('[data-dose]');
+    if (this.doseEl) {
       const t = Math.max(0, Math.min(1, (p - 0.18) / 0.24)); const doseStr = (0.120 * t).toFixed(3);
-      if (doseStr !== this.lastDose) { this.lastDose = doseStr; dose.textContent = doseStr; }
+      if (doseStr !== this.lastDose) { this.lastDose = doseStr; this.doseEl.textContent = doseStr; }
     }
     if (this.tension) {
       const t = Math.max(0, Math.min(1, (p - 0.36) / 0.26));
       if (this.lastTensionT === undefined || Math.abs(this.lastTensionT - t) >= 0.004) {
         this.lastTensionT = t;
         this.tension.style.strokeDashoffset = (this.tensionLen * (1 - t)).toFixed(1);
-        const pt = this.tension.getPointAtLength(this.tensionLen * t);
-        if (this.tensionDotRef.current) { this.tensionDotRef.current.setAttribute('cx', pt.x); this.tensionDotRef.current.setAttribute('cy', pt.y); this.tensionDotRef.current.style.opacity = t > 0 ? 1 : 0; }
+        const pt = this.tensionPts[Math.round(t * TENSION_SAMPLES)];
+        const dot = this.tensionDotRef.current;
+        if (dot && pt) { dot.setAttribute('cx', pt[0].toFixed(2)); dot.setAttribute('cy', pt[1].toFixed(2)); dot.style.opacity = t > 0 ? 1 : 0; }
       }
     }
     if (this.editionRef.current) {
@@ -586,28 +685,34 @@ class Component extends DCLogic {
       const pctStr = Math.round(p * 100) + '%';
       if (pctStr !== this.lastPct) { this.lastPct = pctStr; this.tourPctRef.current.textContent = pctStr; }
     }
-    if (this.state.pct !== undefined && Math.abs(p * 100 - this.state.pct) > 2) this.setState({ pct: p * 100 });
-
-    if (this.tourActive && this.tourT0) {
-      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      const dur = TOUR_BASE_MS / this.state.speed;
-      this.tourT = this.tourFromT + (performance.now() - this.tourT0) / dur;
-      if (this.tourT >= 1) { this.tourT = 1; this.tourActive = false; this.setState({ tour: 'done' }); }
-      window.scrollTo(0, max * this.tourT);
-      this.suppress = true;
-      requestAnimationFrame(() => { this.suppress = false; });
+    // setState re-renders the whole template through renderVals(); the readout above is a ref,
+    // so only re-render when something structural actually flips. Decile steps also stop the
+    // aria-live region from announcing on every scroll tick.
+    const restart = p * 100 > 2;
+    const decile = Math.min(10, Math.floor(p * 10));
+    if (restart !== this.lastRestart || decile !== this.lastDecile) {
+      this.lastRestart = restart; this.lastDecile = decile;
+      this.setState({ pct: p * 100 });
     }
   }
 
   /* ---------- tour ---------- */
+  driveTour() {
+    const dur = TOUR_BASE_MS / this.state.speed;
+    this.tourT = this.tourFromT + (performance.now() - this.tourT0) / dur;
+    if (this.tourT >= 1) { this.tourT = 1; this.tourActive = false; this.setState({ tour: 'done' }); }
+    const y = Math.round(this.scrollMax * this.tourT);
+    if (y !== this.tourLastY) { this.tourLastY = y; window.scrollTo(0, y); }
+  }
   startTour() {
-    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-    this.tourFrom = window.scrollY;
-    this.tourT = window.scrollY / max;
+    this.measure();
+    this.tourT = window.scrollY / this.scrollMax;
     this.tourFromT = this.tourT;
     this.tourT0 = performance.now();
+    this.tourLastY = -1;
     this.tourActive = true;
     this.setState({ tour: 'running' });
+    this.wake();
   }
   pauseTour() { if (this.tourActive) { this.tourActive = false; this.setState({ tour: 'paused' }); } }
   stopTour() { this.tourActive = false; this.setState({ tour: 'idle' }); }
@@ -644,7 +749,12 @@ class Component extends DCLogic {
       copyLabel: this.state.copied ? 'COPIED' : 'COPY PROMPT',
       toggleTour: () => { if (self.state.tour === 'running') self.pauseTour(); else self.startTour(); },
       restartTour: () => { window.scrollTo(0, 0); self.startTour(); },
-      toggleSpeed: () => self.setState({ speed: self.state.speed === 1 ? 2 : 1 }),
+      toggleSpeed: () => {
+        // Rebase the tour clock, otherwise the new duration retroactively rescales elapsed time
+        // and the page jumps.
+        if (self.tourActive) { self.tourFromT = self.tourT; self.tourT0 = performance.now(); }
+        self.setState({ speed: self.state.speed === 1 ? 2 : 1 });
+      },
       toTop: () => window.scrollTo({ top: 0, behavior: self.reduced ? 'auto' : 'smooth' }),
       openPrompt: () => { self.stopTour(); self.setState({ promptOpen: true }); },
       closePrompt: () => self.setState({ promptOpen: false, copied: false }),
