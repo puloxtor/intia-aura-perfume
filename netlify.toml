@@ -1,0 +1,39 @@
+# INTIA Aura — The Perfume
+# Static site, no build step: index.html, support.js, the design-system bundle and the films
+# are served straight from the repo root.
+
+[build]
+  publish = "."
+
+# The films are the whole page. Netlify honours byte ranges, so the scroll engine can seek
+# natively; these headers only govern how often the bytes come back over the network.
+#
+# A week, not `immutable`: the filenames are not content-addressed, so a re-cut film reusing
+# droplet-scrub.mp4 would otherwise be pinned in browser caches for a year. Netlify serves an
+# ETag, so revalidation after expiry is a 304 rather than a re-download.
+[[headers]]
+  for = "/media/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
+  for = "/uploads/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+# The design system lives under a UUID-versioned path, so it genuinely never changes in place.
+[[headers]]
+  for = "/_ds/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The page and the runtime change with every deploy — always revalidate.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/support.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
