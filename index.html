@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/tokens/fonts.css" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/tokens/colors.css" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/tokens/typography.css" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/tokens/spacing.css" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/tokens/surfaces.css" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/tokens/motion.css" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/tokens/base.css" />
+<link rel="stylesheet" href="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/styles.css" />
+<script src="_ds/intia-design-system-dce07d5d-2d52-4437-9935-82e4479468b2/_ds_bundle.js"></script>
+<style>
+  html { background: #1c1c1e; }
+  h1, h2, h3, h4, dt, dd, p, li { color: inherit; }
+  body { margin: 0; background: #1c1c1e; color: #f6f2ec; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  a { color: #e0bdae; text-decoration: none; }
+  a:hover { color: #f6f2ec; }
+  button { font: inherit; }
+  :focus-visible { outline: 1px solid #c29283; outline-offset: 3px; }
+  @keyframes om-drift { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .001ms !important; } }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="position:relative;width:100%;font-family:'Jost',ui-sans-serif,system-ui,sans-serif;font-weight:300;color:#f6f2ec;overflow-x:hidden">
+
+  <div data-stage="" style="position:fixed;inset:0;z-index:0;background:#1c1c1e;overflow:hidden">
+    <video ref="{{ videoRef }}" muted="" playsinline="" preload="auto" disablepictureinpicture="" aria-hidden="true" style="position:absolute;top:50%;left:50%;width:104%;height:104%;transform:translate(-50%,-50%);object-fit:cover;will-change:transform"></video>
+    <div data-vignette="" aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,rgba(28,28,30,0) 35%,rgba(28,28,30,.62) 82%,rgba(28,28,30,.92) 100%)"></div>
+    <div aria-hidden="true" style="position:absolute;inset:0;background:linear-gradient(100deg,rgba(28,28,30,.8) 0%,rgba(28,28,30,.56) 34%,rgba(28,28,30,.12) 62%,rgba(28,28,30,0) 82%)"></div>
+    <div data-tint="" aria-hidden="true" style="position:absolute;inset:0;background:#b07a46;opacity:.1;mix-blend-mode:soft-light"></div>
+  </div>
+
+  <div ref="{{ loaderRef }}" style="position:fixed;inset:0;z-index:60;background:#1c1c1e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:22px;transition:opacity .9s cubic-bezier(.22,.61,.36,1)">
+    <div style="font-family:'Bodoni Moda',serif;font-weight:400;font-size:30px;letter-spacing:.38em;color:#f6f2ec">INTIA</div>
+    <div style="width:180px;height:1px;background:rgba(224,189,174,.24);position:relative;overflow:hidden">
+      <div ref="{{ bufferRef }}" style="position:absolute;inset:0 100% 0 0;background:#c29283;transition:right .3s linear"></div>
+    </div>
+    <div ref="{{ loadLabelRef }}" style="font-size:10px;letter-spacing:.3em;color:rgba(246,242,236,.45)">DECODING FILM</div>
+  </div>
+
+  <header style="position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:flex-start;padding:22px clamp(16px,3vw,40px);pointer-events:none">
+    <div style="display:flex;flex-direction:column;gap:6px;pointer-events:auto">
+      <span style="font-family:'Bodoni Moda',serif;font-weight:400;font-size:22px;letter-spacing:.34em;line-height:1">INTIA</span>
+      <span style="font-size:9px;letter-spacing:.26em;color:rgba(246,242,236,.5)">SCENTUAL HAIR CARE · WHERE RADIANCE WHISPERS</span>
+    </div>
+    <div style="display:flex;gap:18px;align-items:center;pointer-events:auto">
+      <a href="#acquire" style="font-size:10px;letter-spacing:.24em;color:rgba(246,242,236,.72)">THE PERFUME</a>
+      <button type="button" onClick="{{ openPrompt }}" aria-label="Open the reconstruction prompt archive" style="background:none;border:1px solid rgba(224,189,174,.32);border-radius:10px;color:rgba(246,242,236,.72);font-size:10px;letter-spacing:.24em;padding:8px 14px;cursor:pointer">ARCHIVE</button>
+    </div>
+  </header>
+
+  <nav aria-label="Chapters" style="position:fixed;top:50%;right:clamp(10px,2.2vw,26px);transform:translateY(-50%);z-index:40;display:flex;flex-direction:column;gap:0;align-items:flex-end">
+    <div style="position:relative;padding-right:22px;display:flex;flex-direction:column;gap:26px">
+      <div aria-hidden="true" style="position:absolute;top:4px;bottom:4px;right:8px;width:1px;background:rgba(224,189,174,.22)"></div>
+      <div ref="{{ meniscusRef }}" aria-hidden="true" style="position:absolute;right:4px;top:0;width:9px;height:9px;border-radius:50%;background:#e0bdae;box-shadow:0 0 14px rgba(224,189,174,.7)"></div>
+      <sc-for list="{{ chapters }}" as="ch" hint-placeholder-count="5">
+        <button type="button" data-navitem="" onClick="{{ ch.go }}" style="background:none;border:0;padding:0;cursor:pointer;color:rgba(246,242,236,.42);display:flex;gap:10px;align-items:baseline;justify-content:flex-end;transition:color .36s cubic-bezier(.22,.61,.36,1)" style-hover="color:#f6f2ec">
+          <span style="font-size:9px;letter-spacing:.2em">{{ ch.num }}</span>
+          <span style="font-size:9px;letter-spacing:.22em">{{ ch.short }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </nav>
+
+  <main style="position:relative;z-index:20">
+
+    <section data-chapter="0" data-screen-label="Hero" style="min-height:100vh;display:flex;align-items:flex-end;padding:clamp(88px,13vh,140px) clamp(16px,4vw,64px) clamp(64px,9vh,110px)">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(12px,2.4vh,26px);max-width:min(780px,92vw)">
+        <div style="display:flex;gap:14px;align-items:center;font-size:9px;letter-spacing:.28em;color:rgba(224,189,174,.85)">
+          <span aria-hidden="true" style="width:14px;height:7px;border-radius:14px 14px 0 0;background:#b07a46"></span>
+          <span>001 GOURMAND · ROAST VANILLA</span><span aria-hidden="true" style="width:26px;height:1px;background:rgba(224,189,174,.45)"></span><span>THE PERFUME · 50 ML</span>
+        </div>
+        <h1 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(40px,min(8vw,11vh),112px);line-height:.96;letter-spacing:-.01em;text-wrap:balance">
+          <span data-line="" style="display:block;overflow:hidden"><span style="display:block">Aura</span></span>
+          <span data-line="" style="display:block;overflow:hidden"><span style="display:block;font-style:italic;color:#e0bdae">a single drop,</span></span>
+          <span data-line="" style="display:block;overflow:hidden"><span style="display:block">entered from within</span></span>
+        </h1>
+        <p style="margin:0;max-width:46ch;font-size:14px;line-height:1.7;color:rgba(246,242,236,.7);text-wrap:pretty">Eight seconds of film, shot at the scale of one droplet. Scroll to travel through it as it falls — pistachio and almond at the leading edge, heliotrope and jasmin coiling below — and meet hair at the moment it settles. Scent that stays, care that transforms, beauty that whispers.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
+          <a href="#acquire" style="border:1px solid #c29283;border-radius:10px;background:rgba(194,146,131,.12);padding:14px 26px;font-size:10px;letter-spacing:.26em;color:#f6f2ec">DISCOVER THE PERFUME</a>
+          <span style="font-size:10px;letter-spacing:.2em;color:rgba(246,242,236,.7);animation:om-drift 3.4s cubic-bezier(.22,.61,.36,1) infinite">↓ SCROLL TO DESCEND</span>
+        </div>
+      </div>
+    </section>
+
+    <section data-chapter="1" data-screen-label="Chapter 01 The Lip" style="height:100vh;display:flex;align-items:center;padding:0 clamp(16px,4vw,64px)">
+      <div style="max-width:min(560px,92vw);display:grid;gap:20px">
+        <div style="display:flex;gap:12px;align-items:baseline;color:#e0bdae;font-size:10px;letter-spacing:.28em">01 <span style="color:rgba(246,242,236,.55)">THE LIP</span></div>
+        <h2 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(30px,5vw,60px);line-height:1.06">Frost glass, cut at the mouth so the liquid must hesitate.</h2>
+        <p style="margin:0;font-size:14px;line-height:1.7;color:rgba(246,242,236,.68);max-width:44ch">The flacon is frosted glass under a pink gold mat collar. The lip is polished to a radius that holds a bead for roughly two seconds before gravity wins — long enough for the perfume to warm to skin temperature at the edge. Structure and flow, held in one gesture.</p>
+        <dl style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:18px;border-top:1px solid rgba(224,189,174,.22);padding-top:18px">
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">LIP RADIUS</dt><dd style="margin:6px 0 0;font-family:'Bodoni Moda',serif;font-size:26px">1.4 mm</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">HOLD</dt><dd style="margin:6px 0 0;font-family:'Bodoni Moda',serif;font-size:26px">2.1 s</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">TEMP</dt><dd style="margin:6px 0 0;font-family:'Bodoni Moda',serif;font-size:26px">22 °C</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section data-chapter="2" data-screen-label="Chapter 02 Release" style="height:100vh;display:flex;align-items:center;justify-content:flex-end;padding:0 clamp(16px,4vw,64px)">
+      <div style="max-width:min(520px,92vw);display:grid;gap:20px;text-align:right;justify-items:end">
+        <div style="display:flex;gap:12px;align-items:baseline;color:#e0bdae;font-size:10px;letter-spacing:.28em">02 <span style="color:rgba(246,242,236,.55)">RELEASE</span></div>
+        <h2 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(30px,5vw,60px);line-height:1.06">It elongates before it falls. That neck is the dose.</h2>
+        <p style="margin:0;font-size:14px;line-height:1.7;color:rgba(246,242,236,.68);max-width:42ch">One press delivers a measured 0.120 ml, sprayed onto dry hair from 15–20 cm. Enough for the length, never for the room. It is not about more — it is about enough.</p>
+        <div ref="{{ doseRef }}" style="display:flex;align-items:baseline;gap:10px;font-family:'Bodoni Moda',serif;font-size:clamp(44px,8vw,86px);color:#e0bdae;line-height:1">
+          <span data-dose="">0.000</span><span style="font-family:'Jost',sans-serif;font-size:12px;letter-spacing:.2em;color:rgba(246,242,236,.6)">ML RELEASED</span>
+        </div>
+      </div>
+    </section>
+
+    <section data-chapter="3" data-screen-label="Chapter 03 The Membrane" style="height:100vh;display:flex;align-items:center;padding:0 clamp(16px,4vw,64px)">
+      <div style="max-width:min(600px,92vw);display:grid;gap:22px">
+        <div style="display:flex;gap:12px;align-items:baseline;color:#e0bdae;font-size:10px;letter-spacing:.28em">03 <span style="color:rgba(246,242,236,.55)">THE MEMBRANE</span></div>
+        <h2 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(30px,5vw,60px);line-height:1.06">Surface tension is the only container it needs.</h2>
+        <p style="margin:0;font-size:14px;line-height:1.7;color:rgba(246,242,236,.68);max-width:44ch">Inside the drop, scent is not alone. KeraBio K31 — biomimetic keratin at roughly 900 Da — travels with it into the cortex, while Polyfix ZRC binds odour molecules rather than masking them. The wall you pass through is the same material that later holds radiance against the hair.</p>
+        <svg viewBox="0 0 420 120" role="img" aria-label="Diagram of droplet wall tension measured across the fall" style="width:min(420px,88vw);height:auto;overflow:visible">
+          <line x1="0" y1="60" x2="420" y2="60" stroke="rgba(224,189,174,.25)" stroke-width="1"></line>
+          <path ref="{{ tensionRef }}" d="M0,60 C60,60 80,18 140,18 C210,18 220,102 300,102 C360,102 380,60 420,60" fill="none" stroke="#c29283" stroke-width="1.4" stroke-linecap="round"></path>
+          <g fill="rgba(246,242,236,.5)" font-size="8" font-family="Jost" letter-spacing="2">
+            <text x="0" y="116">ENTRY</text><text x="196" y="116">INTERIOR</text><text x="378" y="116">EXIT</text>
+          </g>
+          <circle ref="{{ tensionDotRef }}" cx="0" cy="60" r="3.4" fill="#e0bdae"></circle>
+        </svg>
+      </div>
+    </section>
+
+    <section data-chapter="4" data-screen-label="Chapter 04 The Pyramid" style="height:100vh;display:flex;align-items:center;padding:0 clamp(16px,4vw,64px)">
+      <div style="display:grid;gap:24px;max-width:min(880px,94vw)">
+        <div style="display:flex;gap:12px;align-items:baseline;color:#e0bdae;font-size:10px;letter-spacing:.28em">04 <span style="color:rgba(246,242,236,.55)">THE PYRAMID</span></div>
+        <h2 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(28px,4.4vw,52px);line-height:1.08;max-width:20ch">Three densities, suspended in the same fall.</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:22px;align-items:start">
+          <div role="group" aria-label="Note families" style="display:grid;gap:10px">
+            <sc-for list="{{ notes }}" as="n" hint-placeholder-count="3">
+              <button type="button" onClick="{{ n.select }}" aria-pressed="{{ n.active }}" style="text-align:left;background:{{ n.bg }};border:1px solid {{ n.border }};border-radius:16px;color:#f6f2ec;padding:14px 16px;cursor:pointer;display:grid;gap:6px;transition:background .36s cubic-bezier(.22,.61,.36,1),border-color .36s cubic-bezier(.22,.61,.36,1)">
+                <span style="font-size:9px;letter-spacing:.24em;color:{{ n.hue }}">{{ n.label }}</span>
+                <span style="font-family:'Bodoni Moda',serif;font-size:19px;line-height:1.2">{{ n.title }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display:grid;gap:14px">
+            <svg viewBox="0 0 300 150" role="img" aria-label="Ribbon diagram of note dispersion inside the droplet" style="width:100%;height:auto">
+              <sc-for list="{{ ribbons }}" as="r" hint-placeholder-count="3">
+                <path d="{{ r.d }}" fill="none" stroke="{{ r.hue }}" stroke-width="{{ r.w }}" opacity="{{ r.o }}" stroke-linecap="round" style="transition:opacity .5s cubic-bezier(.22,.61,.36,1),stroke-width .5s cubic-bezier(.22,.61,.36,1)"></path>
+              </sc-for>
+              <g fill="rgba(246,242,236,.4)" font-size="7" font-family="Jost" letter-spacing="1.6">
+                <text x="0" y="146">LEADING EDGE</text><text x="228" y="146">TRAILING</text>
+              </g>
+            </svg>
+            <p style="margin:0;font-size:13.5px;line-height:1.7;color:rgba(246,242,236,.7);min-height:5.4em">{{ activeNote.body }}</p>
+            <p style="margin:0;font-size:10px;letter-spacing:.18em;color:rgba(246,242,236,.42)">{{ activeNote.ingredients }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="acquire" data-chapter="5" data-screen-label="Chapter 05 The Glow" style="min-height:100vh;display:flex;align-items:center;padding:clamp(80px,12vh,140px) clamp(16px,4vw,64px)">
+      <div style="display:grid;gap:30px;max-width:min(900px,94vw);width:100%">
+        <div style="display:flex;gap:12px;align-items:baseline;color:#e0bdae;font-size:10px;letter-spacing:.28em">05 <span style="color:rgba(246,242,236,.55)">THE GLOW</span></div>
+        <h2 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(34px,6.4vw,88px);line-height:1;max-width:16ch">The drop ends on hair. The radiance starts there.</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:26px;border-top:1px solid rgba(224,189,174,.22);padding-top:26px">
+          <div style="display:grid;gap:12px">
+            <p style="margin:0;font-size:14px;line-height:1.7;color:rgba(246,242,236,.7)">Aura — The Perfume, 50 ml, first of Line 01 Scentual Longevity. Take damage away. Take the city away. Take the stress away. Formulas that work. Textures that ground. Design that breathes.</p>
+            <p style="margin:0;font-size:10.5px;line-height:1.7;color:rgba(246,242,236,.42)">Spray onto dry hair from 15–20 cm. External use only. Avoid eyes. PAO 12M. Biopharma Laboratories Italy s.r.l., Via delle Rose no. 48, 40136 Bologna, Italy.</p>
+          </div>
+          <div style="display:grid;gap:14px;align-content:start">
+            <div style="display:flex;justify-content:space-between;font-size:11px;letter-spacing:.18em;border-bottom:1px solid rgba(224,189,174,.18);padding-bottom:10px"><span style="color:rgba(246,242,236,.5)">50 ML HAIR PERFUME</span><span>€ 25</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;letter-spacing:.18em;border-bottom:1px solid rgba(224,189,174,.18);padding-bottom:10px"><span style="color:rgba(246,242,236,.5)">WEAR</span><span ref="{{ editionRef }}">UP TO 00 H</span></div>
+            <a href="#acquire" style="border:1px solid #c29283;border-radius:10px;background:rgba(194,146,131,.16);padding:16px 24px;text-align:center;font-size:10px;letter-spacing:.26em;color:#f6f2ec">DISCOVER THE PERFUME</a>
+            <button type="button" onClick="{{ toTop }}" style="background:none;border:0;color:rgba(246,242,236,.5);font-size:10px;letter-spacing:.22em;cursor:pointer;text-align:center;padding:6px">↑ RETURN TO THE LIP</button>
+          </div>
+        </div>
+        <footer style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;font-size:9.5px;letter-spacing:.2em;color:rgba(246,242,236,.35);border-top:1px solid rgba(224,189,174,.14);padding-top:20px">
+          <span>INTIA · SCENTUAL HAIR CARE · SILENT RADIANCE. SOFT STRENGTH. STILL INDULGENCE.</span>
+          <button type="button" onClick="{{ openPrompt }}" style="background:none;border:0;color:rgba(224,189,174,.85);letter-spacing:.2em;font-size:9.5px;cursor:pointer;padding:0">RECONSTRUCTION ARCHIVE →</button>
+        </footer>
+      </div>
+    </section>
+  </main>
+
+  <div style="position:fixed;left:50%;transform:translateX(-50%);bottom:clamp(10px,2vh,22px);z-index:45;display:flex;gap:8px;align-items:center;max-width:calc(100vw - 32px);background:rgba(28,28,30,.7);border:1px solid rgba(224,189,174,.24);border-radius:999px;padding:8px 12px;backdrop-filter:blur(9px)">
+    <button type="button" onClick="{{ toggleTour }}" style="background:none;border:0;color:#f6f2ec;font-size:10px;letter-spacing:.22em;cursor:pointer;padding:4px 6px">{{ tourLabel }}</button>
+    <span aria-hidden="true" style="width:1px;height:14px;background:rgba(224,189,174,.24)"></span>
+    <span ref="{{ tourPctRef }}" aria-hidden="true" style="font-size:10px;letter-spacing:.14em;color:rgba(246,242,236,.6);min-width:40px;text-align:right">0%</span>
+    <span aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">{{ tourStatus }}</span>
+    <sc-if value="{{ showRestart }}" hint-placeholder-val="{{ false }}">
+      <button type="button" onClick="{{ restartTour }}" style="background:none;border:0;color:rgba(246,242,236,.6);font-size:10px;letter-spacing:.2em;cursor:pointer;padding:4px 6px">RESTART</button>
+    </sc-if>
+    <button type="button" onClick="{{ toggleSpeed }}" aria-label="Tour speed" style="background:none;border:1px solid rgba(224,189,174,.24);border-radius:999px;color:rgba(246,242,236,.7);font-size:10px;letter-spacing:.14em;cursor:pointer;padding:4px 10px">{{ speedLabel }}</button>
+  </div>
+
+  <sc-if value="{{ promptOpen }}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-label="Reconstruction prompt archive" style="position:fixed;inset:0;z-index:80;background:#1c1c1e;overflow-y:auto;padding:clamp(20px,5vw,70px)">
+      <div style="max-width:860px;margin:0 auto;display:grid;gap:26px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+          <span style="font-family:'Bodoni Moda',serif;font-weight:400;font-size:22px;letter-spacing:.34em">INTIA</span>
+          <div style="display:flex;gap:10px">
+            <button type="button" onClick="{{ copyPrompt }}" style="border:1px solid #c29283;border-radius:10px;background:rgba(194,146,131,.14);color:#f6f2ec;font-size:10px;letter-spacing:.22em;padding:10px 16px;cursor:pointer">{{ copyLabel }}</button>
+            <button type="button" onClick="{{ closePrompt }}" style="border:1px solid rgba(224,189,174,.3);border-radius:10px;background:none;color:rgba(246,242,236,.75);font-size:10px;letter-spacing:.22em;padding:10px 16px;cursor:pointer">← BACK TO THE FILM</button>
+          </div>
+        </div>
+        <h1 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(30px,5vw,58px);line-height:1.04">Reconstruction archive — Aura, The Perfume</h1>
+        <dl style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;border-top:1px solid rgba(224,189,174,.2);border-bottom:1px solid rgba(224,189,174,.2);padding:18px 0">
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">SOURCE FILM</dt><dd style="margin:6px 0 0;font-size:12px">droplet-60fps.mp4</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PATH</dt><dd style="margin:6px 0 0;font-size:12px">/media/droplet-60fps.mp4</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PALETTE</dt><dd style="margin:6px 0 0;font-size:12px">#1c1c1e · #b07a46 · #e0bdae · #f6f2ec</dd></div>
+        </dl>
+        <pre ref="{{ promptRef }}" style="margin:0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.8;color:rgba(246,242,236,.78);background:rgba(224,189,174,.05);border:1px solid rgba(224,189,174,.16);border-radius:16px;padding:clamp(16px,3vw,30px)">{{ promptText }}</pre>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+/* Scroll-video engine constants */
+const DAMP_PER_SEC = 7.2;        // exponential damping rate for the internal playhead
+const SEEK_EPSILON = 0.033;      // seconds (~one frame); below this we do not issue a new seek
+const TOUR_BASE_MS = 20000;      // 1x tour duration for the whole page
+
+class Component extends DCLogic {
+  state = { note: 0, tour: 'idle', speed: 1, pct: 0, promptOpen: false, copied: false };
+
+  videoRef = React.createRef();
+  loaderRef = React.createRef();
+  bufferRef = React.createRef();
+  loadLabelRef = React.createRef();
+  meniscusRef = React.createRef();
+  doseRef = React.createRef();
+  tensionRef = React.createRef();
+  tensionDotRef = React.createRef();
+  editionRef = React.createRef();
+  rootRef = React.createRef();
+  tourPctRef = React.createRef();
+  promptRef = React.createRef();
+
+  noteData = [
+    { label: 'TOP · FAST, DISPERSING', title: 'Pistachio and almond', hue: '#e5dee2',
+      body: 'At the leading edge the light fractions break away first — pistachio, sweet almond, a thin cut of air. They travel fastest through the fluid and off the hair, holding the first quiet minutes.',
+      ingredients: 'PISTACHIO · ALMOND' },
+    { label: 'HEART · COILING', title: 'Heliotrope and jasmin', hue: '#e0bdae',
+      body: 'Mid-fall the heart turns over on itself: heliotrope, jasmin, powdered and unhurried. Slower and warmer, it marbles into the top notes rather than replacing them.',
+      ingredients: 'HELIOTROPE · JASMIN' },
+    { label: 'BASE · HEAVY, SLOW', title: 'Caramel, salt, sandalwood', hue: '#b07a46',
+      body: 'The heaviest strands sink to the trailing edge and stay there — caramel, vanilla, a grain of salt over sandalwood. On hair this is what remains after the bloom has thinned into the air.',
+      ingredients: 'CARAMEL · VANILLA · SALT · SANDALWOOD' }
+  ];
+
+  ribbonPaths = [
+    'M4,96 C70,88 96,34 150,30 C206,26 250,20 296,14',
+    'M4,80 C64,80 92,66 150,70 C210,74 248,60 296,52',
+    'M4,58 C60,66 100,104 150,110 C204,116 252,112 296,104'
+  ];
+
+  chapterList = [
+    { num: '00', short: 'LIP' }, { num: '01', short: 'RELEASE' }, { num: '02', short: 'MEMBRANE' },
+    { num: '03', short: 'PYRAMID' }, { num: '04', short: 'GLOW' }
+  ];
+
+  promptText = [
+    'RECONSTRUCTION PROMPT — INTIA / AURA, THE PERFUME',
+    '',
+    'SOURCE FILM: droplet-60fps.mp4 (served at /media/droplet-60fps.mp4). Continuous cinematic macro:',
+    'push toward the polished frosted-glass lip of a perfume flacon, an amber droplet elongates',
+    'and releases, camera passes through the surface-tension membrane into the falling liquid,',
+    'travels among marbling colour ribbons (fast pistachio-almond threads leading, coiling',
+    'heliotrope and jasmin, heavy caramel-sandalwood trailing), exits through the far wall at',
+    'impact and ends on a low radial bloom across hair. Never regenerate or alter the film.',
+    '',
+    'BRAND — INTIA, scentual hair care. Silent Radiance. Soft Strength. Still Indulgence.',
+    'Product: Aura — The Perfume, hair perfume, 50 ml, €25, index 001 Gourmand — Roast Vanilla.',
+    'Technology named on page: KeraBio K31 (~900 Da biomimetic keratin) and Polyfix ZRC odour',
+    'capture (zinc ricinoleate). Voice: calm power, refined sensuality, modern poise, textural',
+    'emotion; triads as rhythm; claims hedged; no exclamation marks, no emoji. Regulatory copy',
+    'verbatim: spray onto dry hair from 15-20 cm; external use only; avoid eyes; PAO 12M;',
+    'Biopharma Laboratories Italy s.r.l., Via delle Rose no. 48, 40136 Bologna, Italy.',
+    '',
+    'ART DIRECTION — INTIA tokens only. Graphite #1c1c1e ink ground, ivory #f6f2ec type, rose',
+    'gold #e0bdae / #c29283 as the single matte metal, pearl #e5dee2, and the 001 gourmand group',
+    'code #b07a46 as the only saturated colour (half-dome mark, tint over the film). Type:',
+    'Bodoni Moda regular for display (tight leading, italic as accent), Jost 300 for body,',
+    'uppercase Jost tracked .18-.30em for all labels and instrumentation. Radii 10px buttons,',
+    '16px cards, pill for the tour control. Motion on cubic-bezier(.22,.61,.36,1) only.',
+    '',
+    'NAVIGATION — a meniscus rail: a vertical hairline on the right with a single rose-gold bead',
+    'that travels down it in proportion to document progress, labelled 00 LIP / 01 RELEASE /',
+    '02 MEMBRANE / 03 PYRAMID / 04 GLOW. Clicking a label scrolls to that chapter.',
+    '',
+    'NARRATIVE — 600vh, six full-height beats mapped to the film:',
+    '  HERO      Aura / a single drop, entered from within.',
+    '  01 LIP    frosted lip radius 1.4 mm, 2.1 s hold, 22 °C — the hesitation before release.',
+    '  02 RELEASE the elongating neck is the dose: a counter runs 0.000 -> 0.120 ml on scroll.',
+    '  03 MEMBRANE surface tension as the only container; KeraBio K31 and Polyfix ZRC named; an',
+    '             SVG tension trace with a dot riding entry -> interior -> exit.',
+    '  04 PYRAMID three note families as three SVG ribbons; selecting a family raises its ribbon',
+    '             weight and swaps the composition copy (the interactive element).',
+    '  05 GLOW    commercial close: 50 ml / €25, wear counter, CTA, regulatory block, return.',
+    '',
+    'SCROLL VIDEO ENGINE — native <video>, fixed full-viewport, object-fit cover, muted,',
+    'playsInline, preload auto, disablePictureInPicture. Duration read from loadedmetadata,',
+    'never hardcoded. Document progress sets a TARGET time only; one rAF loop eases an internal',
+    'playhead toward it with frame-rate-independent exponential damping (rate 7.2/s). Never seek',
+    'while the decoder is seeking — keep only the newest target and drain it on `seeked`; no',
+    'unbounded queue, no stale value moving the film backward; seek epsilon one frame;',
+    'requestVideoFrameCallback used where available. The whole file is buffered into a blob URL',
+    'first because the served stream reports an empty seekable range. Restrained loading overlay',
+    'with a buffered progress bar, desktop-only pointer parallax, graceful error handling,',
+    'reduced-motion respected.',
+    '',
+    'AUTO TOUR — fixed pill control, bottom centre: Start Tour -> Pause -> Resume -> Replay, live',
+    'percentage, Restart above 2%, 1x/2x toggle where 1x traverses the whole document in exactly',
+    '20 s and 2x in 10 s, normalized to document height, linear easing. Wheel, touch, drag and',
+    'PageUp/PageDown/Home/End/Space/arrows pause it; Escape stops without resetting scroll.',
+    '',
+    'ACCESSIBILITY — semantic sections, real buttons and links, visible rose-gold focus rings,',
+    'decorative layers aria-hidden, no focus traps, no horizontal overflow, authored mobile.'
+  ].join('\n');
+
+  /* ---------- lifecycle ---------- */
+  componentDidMount() {
+    try { this.boot(); } catch (e) { window.__omErr = '' + e; }
+  }
+
+  boot() {
+    window.__om = this;
+
+    this.mounted = true;
+    this.playhead = 0; this.target = 0; this.seeking = false; this.pending = null;
+    this.duration = 0; this.progress = 0; this.pointer = { x: 0, y: 0 };
+    this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.touch = window.matchMedia('(hover: none)').matches;
+
+    const v = this.videoRef.current;
+    if (v) {
+      this.onMeta = () => { this.duration = v.duration || 0; this.hideLoader(); };
+      this.onSeeked = () => {
+        this.seeking = false;
+        if (this.pending != null) { const t = this.pending; this.pending = null; this.doSeek(t); }
+      };
+      this.onProgress = () => {
+        if (!this.blobUrl) return;
+        try {
+          if (v.buffered.length && v.duration) {
+            const p = v.buffered.end(v.buffered.length - 1) / v.duration;
+            if (this.bufferRef.current) this.bufferRef.current.style.right = (100 - p * 100) + '%';
+          }
+        } catch (e) { /* buffered may throw before metadata */ }
+      };
+      this.onError = () => { if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM UNAVAILABLE — INTERFACE STILL NAVIGABLE'; setTimeout(() => this.hideLoader(), 1200); };
+      v.addEventListener('loadedmetadata', this.onMeta);
+      v.addEventListener('seeked', this.onSeeked);
+      v.addEventListener('progress', this.onProgress);
+      v.addEventListener('error', this.onError);
+      if (v.readyState >= 1) this.onMeta();
+      this.loaderTimeout = setTimeout(() => this.hideLoader(), 12000);
+      this.loadBlob(v);
+    }
+
+    this.onScroll = () => {
+      this.dirty = true;
+      if (performance.now() - (this.lastFrameAt || 0) > 24) {
+        try { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.loop); this.frame(performance.now()); } catch (e) {}
+      }
+    };
+    this.onPointer = (e) => {
+      if (this.touch || this.reduced) return;
+      this.pointer.x = (e.clientX / window.innerWidth - .5);
+      this.pointer.y = (e.clientY / window.innerHeight - .5);
+    };
+    this.onUserScroll = () => this.pauseTour();
+    this.onKey = (e) => {
+      if (e.key === 'Escape') { this.stopTour(); return; }
+      if (['PageUp', 'PageDown', 'Home', 'End', ' ', 'ArrowUp', 'ArrowDown'].indexOf(e.key) > -1) this.pauseTour();
+    };
+    this.onVis = () => { if (!document.hidden) { this.last = performance.now(); this.onScroll(); } };
+    document.addEventListener('visibilitychange', this.onVis);
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+    window.addEventListener('resize', this.onScroll);
+    window.addEventListener('mousemove', this.onPointer, { passive: true });
+    window.addEventListener('wheel', this.onUserScroll, { passive: true });
+    window.addEventListener('touchstart', this.onUserScroll, { passive: true });
+    window.addEventListener('keydown', this.onKey);
+
+    this.sections = Array.prototype.slice.call(document.querySelectorAll('[data-chapter]'));
+    this.navItems = Array.prototype.slice.call(document.querySelectorAll('[data-navitem]'));
+    this.tint = document.querySelector('[data-tint]');
+    this.vignette = document.querySelector('[data-vignette]');
+    this.tension = this.tensionRef.current;
+    if (this.tension) {
+      this.tensionLen = this.tension.getTotalLength();
+      this.tension.style.strokeDasharray = this.tensionLen;
+      this.tension.style.strokeDashoffset = this.tensionLen;
+    }
+    this.last = performance.now();
+    this.dirty = true;
+    this.loop = this.loop.bind(this);
+    this.raf = requestAnimationFrame(this.loop);
+    this.tick = setInterval(() => {
+      if (!this.mounted) return;
+      if (performance.now() - (this.lastFrameAt || 0) > 40) {
+        try { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this.loop); this.frame(performance.now()); } catch (e) {}
+      }
+    }, 33);
+  }
+
+  componentWillUnmount() {
+    this.mounted = false;
+    cancelAnimationFrame(this.raf);
+    clearInterval(this.tick);
+    clearTimeout(this.loaderTimeout);
+    const v = this.videoRef.current;
+    if (v) {
+      v.removeEventListener('loadedmetadata', this.onMeta);
+      v.removeEventListener('seeked', this.onSeeked);
+      v.removeEventListener('progress', this.onProgress);
+      v.removeEventListener('error', this.onError);
+    }
+    document.removeEventListener('visibilitychange', this.onVis);
+    window.removeEventListener('scroll', this.onScroll);
+    window.removeEventListener('resize', this.onScroll);
+    window.removeEventListener('mousemove', this.onPointer);
+    window.removeEventListener('wheel', this.onUserScroll);
+    window.removeEventListener('touchstart', this.onUserScroll);
+    window.removeEventListener('keydown', this.onKey);
+  }
+
+  async loadBlob(v) {
+    try {
+      const res = await fetch('media/droplet-60fps.mp4');
+      if (!res.ok) throw new Error('fetch failed');
+      const total = Number(res.headers.get('content-length')) || 0;
+      const reader = res.body && res.body.getReader ? res.body.getReader() : null;
+      let blob;
+      if (reader) {
+        const chunks = []; let got = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value); got += value.length;
+          if (total && this.bufferRef.current) this.bufferRef.current.style.right = (100 - (got / total) * 100).toFixed(1) + '%';
+        }
+        blob = new Blob(chunks, { type: 'video/mp4' });
+      } else {
+        blob = await res.blob();
+      }
+      if (!this.mounted) return;
+      this.blobUrl = URL.createObjectURL(blob);
+      if (this.bufferRef.current) this.bufferRef.current.style.right = '0%';
+      v.src = this.blobUrl;
+      v.load();
+    } catch (e) {
+      if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM STREAMING — SCRUB LIMITED';
+      v.src = 'media/droplet-60fps.mp4';
+      v.load();
+    } finally {
+      setTimeout(() => this.hideLoader(), 400);
+    }
+  }
+
+  hideLoader() {
+    const l = this.loaderRef.current;
+    if (l && l.style.opacity !== '0') { l.style.opacity = '0'; setTimeout(() => { if (l) l.style.pointerEvents = 'none'; }, 900); }
+  }
+
+  doSeek(t) {
+    const v = this.videoRef.current;
+    if (!v || !this.duration) return;
+    const clamped = Math.max(0, Math.min(this.duration - 0.02, t));
+    if (Math.abs(clamped - v.currentTime) < SEEK_EPSILON) return;
+    if (this.seeking) { this.pending = clamped; return; }
+    this.seeking = true;
+    try { v.currentTime = clamped; } catch (e) { this.seeking = false; }
+    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => { this.seeking = false; if (this.pending != null) { const p = this.pending; this.pending = null; this.doSeek(p); } });
+  }
+
+  loop(now) {
+    if (!this.mounted) return;
+    this.raf = requestAnimationFrame(this.loop);
+    try { this.frame(now); } catch (e) { /* never break the rAF chain */ }
+  }
+
+  frame(now) {
+    this.lastFrameAt = performance.now();
+    const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now;
+    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const p = Math.max(0, Math.min(1, window.scrollY / max));
+    this.progress = p;
+
+    const vid = this.videoRef.current;
+    if (vid) {
+      if (!this.duration && vid.duration) this.duration = vid.duration;
+      if (this.seeking && !vid.seeking) { this.seeking = false; this.pending = null; }
+    }
+    if (this.duration) {
+      this.target = p * this.duration;
+      const k = 1 - Math.exp(-DAMP_PER_SEC * dt);
+      this.playhead += (this.target - this.playhead) * (dt > 0.12 ? 1 : k);
+      this.doSeek(this.playhead);
+    }
+    this.paint(p, dt);
+  }
+
+  paint(p, dt) {
+    const v = this.videoRef.current;
+    if (v) {
+      const px = (this.touch || this.reduced) ? 0 : this.pointer.x * -16;
+      const py = (this.touch || this.reduced) ? 0 : this.pointer.y * -12;
+      const scale = 1.1 - 0.08 * p;
+      v.style.transform = 'translate(calc(-50% + ' + px.toFixed(2) + 'px), calc(-50% + ' + py.toFixed(2) + 'px)) scale(' + scale.toFixed(4) + ')';
+    }
+    if (this.tint) {
+      // pearl -> sand -> gourmand -> rose gold -> ivory
+      const stops = [[229,222,226], [222,208,189], [176,122,70], [176,122,70], [224,189,174], [246,242,236]];
+      const f = p * (stops.length - 1), i0 = Math.min(stops.length - 1, Math.floor(f)), i1 = Math.min(stops.length - 1, i0 + 1), t = f - i0;
+      const c = stops[i0].map((s, k) => Math.round(s + (stops[i1][k] - s) * t));
+      const op = (0.1 + 0.1 * Math.sin(p * Math.PI)).toFixed(3);
+      if (!this.lastTintC || this.lastTintC[0] !== c[0] || this.lastTintC[1] !== c[1] || this.lastTintC[2] !== c[2]) {
+        this.lastTintC = c;
+        this.tint.style.background = 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+      }
+      if (this.lastTintOp !== op) { this.lastTintOp = op; this.tint.style.opacity = op; }
+    }
+    if (this.vignette) this.vignette.style.opacity = (0.55 + 0.45 * Math.abs(Math.cos(p * Math.PI))).toFixed(3);
+    if (!this.metrics || this.metricsW !== window.innerWidth || this.metricsH !== window.innerHeight) {
+      this.metricsW = window.innerWidth; this.metricsH = window.innerHeight;
+      this.metrics = this.sections.map(el => ({ top: el.offsetTop, h: el.offsetHeight }));
+    }
+    const n = this.sections.length;
+    const sy = window.scrollY, vh = window.innerHeight;
+    for (let i = 0; i < n; i++) {
+      const el = this.sections[i], m = this.metrics[i];
+      const center = m.top + m.h / 2 - sy;
+      const d = Math.abs(center - vh / 2) / vh;
+      const o = Math.max(0, Math.min(1, 1.25 - d * 1.9));
+      if (!this.lastO || this.lastO.length !== n) this.lastO = new Array(n).fill(-1);
+      if (Math.abs(this.lastO[i] - o) < 0.004) continue;
+      this.lastO[i] = o;
+      el.style.opacity = o.toFixed(3);
+      const dir = center > vh / 2 ? 1 : -1;
+      el.style.transform = 'translate3d(0,' + (dir * (1 - o) * 46).toFixed(1) + 'px,0) scale(' + (0.985 + o * 0.015).toFixed(4) + ')';
+      el.style.willChange = o > 0 && o < 1 ? 'transform,opacity' : 'auto';
+      el.style.pointerEvents = o > 0.6 ? 'auto' : 'none';
+    }
+    if (this.meniscusRef.current) {
+      const rail = this.meniscusRef.current.parentElement;
+      const h = rail ? rail.clientHeight - 9 : 0;
+      this.meniscusRef.current.style.transform = 'translateY(' + (p * h).toFixed(1) + 'px)';
+    }
+    const active = Math.min(this.chapterList.length - 1, Math.floor(p * this.chapterList.length + 0.15));
+    if (active !== this.lastActiveNav) {
+      this.lastActiveNav = active;
+      for (let i = 0; i < this.navItems.length; i++) this.navItems[i].style.color = i === active ? '#f6f2ec' : 'rgba(246,242,236,.42)';
+    }
+
+    const dose = this.doseRef.current && this.doseRef.current.querySelector('[data-dose]');
+    if (dose) {
+      const t = Math.max(0, Math.min(1, (p - 0.18) / 0.24)); const doseStr = (0.120 * t).toFixed(3);
+      if (doseStr !== this.lastDose) { this.lastDose = doseStr; dose.textContent = doseStr; }
+    }
+    if (this.tension) {
+      const t = Math.max(0, Math.min(1, (p - 0.36) / 0.26));
+      if (this.lastTensionT === undefined || Math.abs(this.lastTensionT - t) >= 0.004) {
+        this.lastTensionT = t;
+        this.tension.style.strokeDashoffset = (this.tensionLen * (1 - t)).toFixed(1);
+        const pt = this.tension.getPointAtLength(this.tensionLen * t);
+        if (this.tensionDotRef.current) { this.tensionDotRef.current.setAttribute('cx', pt.x); this.tensionDotRef.current.setAttribute('cy', pt.y); this.tensionDotRef.current.style.opacity = t > 0 ? 1 : 0; }
+      }
+    }
+    if (this.editionRef.current) {
+      const t = Math.max(0, Math.min(1, (p - 0.82) / 0.16));
+      const editionStr = 'UP TO ' + String(Math.round(t * 12)).padStart(2, '0') + ' H';
+      if (editionStr !== this.lastEdition) { this.lastEdition = editionStr; this.editionRef.current.textContent = editionStr; }
+    }
+    if (this.tourPctRef.current) {
+      const pctStr = Math.round(p * 100) + '%';
+      if (pctStr !== this.lastPct) { this.lastPct = pctStr; this.tourPctRef.current.textContent = pctStr; }
+    }
+    if (this.state.pct !== undefined && Math.abs(p * 100 - this.state.pct) > 2) this.setState({ pct: p * 100 });
+
+    if (this.tourActive && this.tourT0) {
+      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const dur = TOUR_BASE_MS / this.state.speed;
+      this.tourT = this.tourFromT + (performance.now() - this.tourT0) / dur;
+      if (this.tourT >= 1) { this.tourT = 1; this.tourActive = false; this.setState({ tour: 'done' }); }
+      window.scrollTo(0, max * this.tourT);
+      this.suppress = true;
+      requestAnimationFrame(() => { this.suppress = false; });
+    }
+  }
+
+  /* ---------- tour ---------- */
+  startTour() {
+    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    this.tourFrom = window.scrollY;
+    this.tourT = window.scrollY / max;
+    this.tourFromT = this.tourT;
+    this.tourT0 = performance.now();
+    this.tourActive = true;
+    this.setState({ tour: 'running' });
+  }
+  pauseTour() { if (this.tourActive) { this.tourActive = false; this.setState({ tour: 'paused' }); } }
+  stopTour() { this.tourActive = false; this.setState({ tour: 'idle' }); }
+
+  renderVals() {
+    const self = this;
+    const tour = this.state.tour;
+    const labels = { idle: 'START TOUR', running: 'PAUSE', paused: 'RESUME', done: 'REPLAY' };
+    const notes = this.noteData.map((n, i) => ({
+      label: n.label, title: n.title, hue: n.hue, active: this.state.note === i,
+      bg: this.state.note === i ? 'rgba(176,122,70,.18)' : 'rgba(28,28,30,.42)',
+      border: this.state.note === i ? 'rgba(224,189,174,.55)' : 'rgba(224,189,174,.18)',
+      select: () => self.setState({ note: i })
+    }));
+    const ribbons = this.ribbonPaths.map((d, i) => ({
+      d: d, hue: this.noteData[i].hue,
+      w: this.state.note === i ? 3 : 1,
+      o: this.state.note === i ? 1 : 0.32
+    }));
+    const chapters = this.chapterList.map((c, i) => Object.assign({}, c, {
+      go: () => { const el = self.sections && self.sections[i + 1] ? self.sections[i + 1] : self.sections[i]; if (el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top, behavior: self.reduced ? 'auto' : 'smooth' }); }
+    }));
+    return {
+      rootRef: this.rootRef, videoRef: this.videoRef, loaderRef: this.loaderRef, bufferRef: this.bufferRef,
+      loadLabelRef: this.loadLabelRef, meniscusRef: this.meniscusRef, doseRef: this.doseRef,
+      tensionRef: this.tensionRef, tensionDotRef: this.tensionDotRef, editionRef: this.editionRef,
+      tourPctRef: this.tourPctRef, promptRef: this.promptRef,
+      chapters: chapters, notes: notes, ribbons: ribbons, activeNote: this.noteData[this.state.note],
+      tourLabel: labels[tour], tourStatus: 'Tour ' + tour + ', ' + Math.round(this.state.pct) + ' percent',
+      speedLabel: this.state.speed === 1 ? '1×' : '2×',
+      showRestart: this.state.pct > 2,
+      promptOpen: this.state.promptOpen,
+      promptText: this.promptText,
+      copyLabel: this.state.copied ? 'COPIED' : 'COPY PROMPT',
+      toggleTour: () => { if (self.state.tour === 'running') self.pauseTour(); else self.startTour(); },
+      restartTour: () => { window.scrollTo(0, 0); self.startTour(); },
+      toggleSpeed: () => self.setState({ speed: self.state.speed === 1 ? 2 : 1 }),
+      toTop: () => window.scrollTo({ top: 0, behavior: self.reduced ? 'auto' : 'smooth' }),
+      openPrompt: () => { self.stopTour(); self.setState({ promptOpen: true }); },
+      closePrompt: () => self.setState({ promptOpen: false, copied: false }),
+      copyPrompt: () => {
+        const t = self.promptText;
+        if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => self.setState({ copied: true }));
+        else self.setState({ copied: true });
+        setTimeout(() => self.mounted && self.setState({ copied: false }), 2200);
+      }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

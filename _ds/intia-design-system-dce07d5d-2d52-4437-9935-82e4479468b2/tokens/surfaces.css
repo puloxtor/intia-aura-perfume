@@ -1,0 +1,44 @@
+:root{
+/* ---- Corner radii ----
+   "Shapes: rounded edges, balanced proportions, timeless silhouettes."
+   Nothing in INTIA has a hard 90° corner except full-bleed imagery. */
+--radius-xs:6px;--radius-sm:10px;--radius-md:16px;--radius-lg:24px;--radius-xl:36px;--radius-pill:999px;
+--radius-dome:999px 999px 0 0;/* @kind radius */                 /* the INTIA mark */
+--radius-capsule:999px 999px 999px 999px/44% 44% 44% 44%;/* @kind radius */ /* flacon + tube silhouette */
+--radius-lozenge:999px;/* @kind radius */
+
+/* ---- Borders ---- */
+--border-width:1px;/* @kind spacing */
+--border-hair:1px solid var(--border-hairline);
+--border-ink:1px solid var(--border-strong);
+--border-rose:1px solid var(--border-metal);
+
+/* ---- Elevation — diffuse daylight, never a hard drop ---- */
+--shadow-none:none;
+--shadow-soft:0 1px 2px rgba(28,28,30,.03),0 6px 18px -14px rgba(28,28,30,.18);
+--shadow-card:0 2px 6px rgba(28,28,30,.04),0 22px 48px -30px rgba(28,28,30,.28);
+--shadow-lift:0 4px 10px rgba(28,28,30,.05),0 36px 70px -34px rgba(28,28,30,.34);
+--shadow-inset-hair:inset 0 0 0 1px var(--border-hairline);
+--shadow-pearl:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -14px 26px -18px rgba(194,146,131,.35);
+
+/* ---- NACRE / IRIDESCENCE — "the red thread of all perfumes" ----
+   A whisper of inner glow beneath matte restraint. Always low opacity,
+   always over a neutral; never a saturated rainbow. */
+--nacre-sheen:linear-gradient(112deg,#f2e9ec 0%,#e4edf1 24%,#f5ece0 48%,#eae5f2 72%,#f3eae5 100%);/* @kind color */
+--nacre-veil:linear-gradient(112deg,rgba(226,237,241,.55),rgba(245,236,224,.55) 45%,rgba(234,229,242,.55));/* @kind color */
+--nacre-edge:linear-gradient(90deg,rgba(226,237,241,0),rgba(240,224,232,.9),rgba(245,236,224,0));/* @kind color */
+
+/* ---- Material washes ---- */
+--wash-ivory:linear-gradient(180deg,var(--ivory-50),var(--ivory-200));/* @kind color */
+--wash-pearl:linear-gradient(160deg,var(--pearl-100),var(--pearl-300));/* @kind color */
+--wash-ink:linear-gradient(180deg,var(--graphite-900),var(--graphite-700));/* @kind color */
+--wash-bronze:linear-gradient(150deg,var(--sand-100),var(--rosegold-300) 60%,var(--bronze-500));/* @kind color */
+
+/* ---- Frost glass — the packaging's inner material, and the site's nav ---- */
+--frost-bg:rgba(246,242,236,.66);--frost-blur:blur(18px) saturate(115%);/* @kind other */
+--frost-bg-dark:rgba(28,28,30,.5);
+
+/* ---- Protection gradients over imagery ---- */
+--scrim-bottom:linear-gradient(to top,rgba(28,28,30,.6),rgba(28,28,30,0) 62%);/* @kind color */
+--scrim-ink:linear-gradient(to bottom,rgba(28,28,30,.46),rgba(28,28,30,.06));/* @kind color */
+}

@@ -1,0 +1,25 @@
+:root{
+--font-display:"Bodoni Moda",'Didot','Times New Roman',serif;
+--font-sans:"Jost",'Futura','Avenir Next',sans-serif;
+--font-body:var(--font-sans);
+/* Display (Bodoni Moda) — set light, never bold */
+--display-1-size:76px;--display-1-lh:1.02;/* @kind other */--display-1-ls:-0.015em;/* @kind other */
+--display-2-size:54px;--display-2-lh:1.08;/* @kind other */--display-2-ls:-0.01em;/* @kind other */
+--display-3-size:38px;--display-3-lh:1.15;/* @kind other */--display-3-ls:-0.005em;/* @kind other */
+--display-4-size:27px;--display-4-lh:1.25;/* @kind other */--display-4-ls:0em;/* @kind other */
+/* Body (Jost) */
+--body-lg-size:18px;--body-lg-lh:1.62;/* @kind other */
+--body-md-size:15px;--body-md-lh:1.68;/* @kind other */
+--body-sm-size:13px;--body-sm-lh:1.6;/* @kind other */
+/* Utility / label — tracked caps, the brand's structural voice */
+--eyebrow-size:11px;--eyebrow-ls:0.22em;/* @kind other */--eyebrow-weight:400;/* @kind font */
+--label-size:12px;--label-ls:0.14em;/* @kind other */
+--button-size:12px;--button-ls:0.16em;/* @kind other */
+--weight-light:300;/* @kind font */--weight-regular:400;/* @kind font */--weight-medium:500;/* @kind font */
+}
+.intia-display-1{font-family:var(--font-display);font-weight:var(--weight-regular);font-size:var(--display-1-size);line-height:var(--display-1-lh);letter-spacing:var(--display-1-ls)}
+.intia-display-2{font-family:var(--font-display);font-weight:var(--weight-regular);font-size:var(--display-2-size);line-height:var(--display-2-lh);letter-spacing:var(--display-2-ls)}
+.intia-display-3{font-family:var(--font-display);font-weight:var(--weight-regular);font-size:var(--display-3-size);line-height:var(--display-3-lh)}
+.intia-display-4{font-family:var(--font-display);font-weight:var(--weight-regular);font-size:var(--display-4-size);line-height:var(--display-4-lh)}
+.intia-body{font-family:var(--font-body);font-weight:var(--weight-light);font-size:var(--body-md-size);line-height:var(--body-md-lh)}
+.intia-eyebrow{font-family:var(--font-body);font-size:var(--eyebrow-size);letter-spacing:var(--eyebrow-ls);text-transform:uppercase;font-weight:var(--weight-regular)}

@@ -1,0 +1,50 @@
+:root{
+/* ================= BASE PALETTE =================
+   From the INTIA brand brief: "Neutrals — ivory, ash, sand, bronze, pearl.
+   Rose gold. Soft, easy on the eye, calming." Base is always the same;
+   colour enters only through the perfume group and the nacre sheen. */
+
+/* Ivory — the page. Warm, never white. */
+--ivory-50:#faf7f3;--ivory-100:#f6f2ec;--ivory-200:#efe9e1;--ivory-300:#e6ded4;
+/* Pearl — Pantone 663 C, the packaging base */
+--pearl-100:#f1ecef;--pearl-200:#e5dee2;/* PANTONE 663 C */--pearl-300:#d6cdd3;
+/* Ash — cool structural greys (brushed steel, frosted glass) */
+--ash-100:#dcdad6;--ash-200:#c3c1bd;--ash-300:#a8a6a3;--ash-500:#7c7a77;--ash-700:#565452;
+/* Graphite — type and ink surfaces (the logotype black) */
+--graphite-900:#1c1c1e;--graphite-800:#26262a;--graphite-700:#33333a;--graphite-600:#474750;
+/* Sand & Bronze — the warm side of the neutral axis */
+--sand-100:#efe6da;--sand-200:#ded0bd;--sand-300:#c9b79e;--bronze-500:#8a6a4f;--bronze-700:#6a5039;
+/* Rose gold / pink gold mat — the only metal, used matte */
+--rosegold-100:#f3e2da;--rosegold-300:#e0bdae;--rosegold-500:#c29283;--rosegold-700:#a1705f;
+
+/* ================= PERFUME GROUP CODES =================
+   "The half-circle shape is coloured based on the perfume group."
+   One colour + one tint per olfactive group. */
+--group-gourmand:#b07a46;--group-gourmand-tint:#f0e3d4;   /* 001 — Roast Vanilla */
+--group-airy:#93aebd;--group-airy-tint:#e2eaef;           /* 002 — Bare Air */
+--group-flower:#c58e9b;--group-flower-tint:#f2e2e5;       /* 003 — Ambrosia */
+--group-citrus:#d9762f;--group-citrus-tint:#f8e3d2;       /* 004 — Crispy Orange */
+--group-cherry:#8e2f3f;--group-cherry-tint:#eed7d9;       /* 005 — Black Cherry */
+
+/* ================= MATERIAL × PEARL FAMILIES =================
+   The five fragrance personalities in the brief. Used for editorial
+   surfaces and swatches, not for UI state. */
+--matter-steel:#8f9aa1;--matter-steel-tint:#dfe4e7;
+--matter-wood:#8a6a4b;--matter-wood-tint:#e6dbcd;
+--matter-glass:#b3c6c9;--matter-glass-tint:#e6eeee;
+--matter-stone:#a9a49a;--matter-stone-tint:#e4e1db;
+--matter-gold:#c39a5a;--matter-gold-tint:#f0e3cd;
+
+/* ================= STATUS ================= */
+--status-success:#6a7c62;--status-warning:#a8813f;--status-danger:#94414a;--status-info:#61798a;
+--status-success-tint:#e4e8df;--status-warning-tint:#f2e7d2;--status-danger-tint:#efdcde;--status-info-tint:#e0e7ec;
+
+/* ================= SEMANTIC ALIASES ================= */
+--text-primary:var(--graphite-700);--text-strong:var(--graphite-900);--text-secondary:var(--ash-500);--text-muted:var(--ash-300);--text-inverse:var(--ivory-100);--text-metal:var(--rosegold-700);
+--surface-page:var(--ivory-100);--surface-card:#fffdfa;--surface-sunken:var(--ivory-200);--surface-pearl:var(--pearl-200);--surface-ink:var(--graphite-900);--surface-ink-soft:var(--graphite-700);--surface-overlay:rgba(28,28,30,.42);
+--border-hairline:#e2dad0;--border-soft:#eee7de;--border-strong:var(--graphite-700);--border-metal:var(--rosegold-300);--border-inverse:rgba(246,242,236,.24);
+--action-primary-bg:var(--graphite-900);--action-primary-fg:var(--ivory-100);--action-primary-bg-hover:var(--graphite-700);
+--action-secondary-fg:var(--graphite-900);--action-secondary-border:var(--ash-200);--action-secondary-bg-hover:var(--ivory-200);
+--action-metal-fg:var(--rosegold-700);--action-metal-border:var(--rosegold-300);--action-metal-bg-hover:var(--rosegold-100);
+--focus-ring:var(--rosegold-500);
+}

@@ -1,0 +1,3 @@
+/* Token stylesheets are already linked directly in <helmet> (fonts, colors,
+   typography, spacing, surfaces, motion, base) — importing them again here
+   doubled every CSS fetch and CSSOM parse on load, so this file is now empty. */
