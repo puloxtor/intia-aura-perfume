@@ -212,8 +212,8 @@
         </div>
         <h1 style="margin:0;font-family:'Bodoni Moda',serif;font-weight:400;font-size:clamp(30px,5vw,58px);line-height:1.04">Reconstruction archive — Aura, The Perfume</h1>
         <dl style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;border-top:1px solid rgba(224,189,174,.2);border-bottom:1px solid rgba(224,189,174,.2);padding:18px 0">
-          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">SOURCE FILM</dt><dd style="margin:6px 0 0;font-size:12px">droplet-scrub.mp4 · 1280×720 · 30 fps · GOP 6</dd></div>
-          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PATH</dt><dd style="margin:6px 0 0;font-size:12px">/media/droplet-scrub.mp4</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">SOURCE FILM</dt><dd style="margin:6px 0 0;font-size:12px">droplet-scrub-1080.mp4 · 1920×1080 · 60 fps · GOP 6</dd></div>
+          <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PATH</dt><dd style="margin:6px 0 0;font-size:12px">/media/droplet-scrub-1080.mp4</dd></div>
           <div><dt style="font-size:9px;letter-spacing:.22em;color:rgba(246,242,236,.42)">PALETTE</dt><dd style="margin:6px 0 0;font-size:12px">#1c1c1e · #b07a46 · #e0bdae · #f6f2ec</dd></div>
         </dl>
         <pre ref="{{ promptRef }}" style="margin:0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.8;color:rgba(246,242,236,.78);background:rgba(224,189,174,.05);border:1px solid rgba(224,189,174,.16);border-radius:16px;padding:clamp(16px,3vw,30px)">{{ promptText }}</pre>
@@ -225,20 +225,24 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
 /* Scroll-video engine constants */
-/* Film candidates, best first. The scrub cut is the one worth having — 720p30 with a 6-frame
-   GOP, encoded for seeking rather than playback — but a host that has not picked it up yet must
-   still show a film, so the originals already sitting on the server follow it. */
-const FILM_SOURCES = [
-  'media/droplet-scrub.mp4',
-  'media/droplet-60fps.mp4',
-  'uploads/60fps.mp4'
+/* Film ladder. Both cuts carry a 6-frame GOP so a seek decodes 5 P-frames instead of walking a
+   long one; the 1080p cut is the master's native resolution at 60 fps, which is what makes the
+   film read as crisp and gives the scroll a new frame every ~9px instead of every ~19px. Small
+   and low-DPR screens take the lighter cut. The originals already on the server trail both, so
+   a host that has not picked up the new files still shows a film. */
+const FILM_LADDER = [
+  { minEffectivePx: 1280, src: 'media/droplet-scrub-1080.mp4' },
+  { minEffectivePx: 0,    src: 'media/droplet-scrub-720.mp4' }
 ];
+const FILM_FALLBACKS = ['media/droplet-60fps.mp4', 'uploads/60fps.mp4'];
 const DAMP_PER_SEC = 7.2;        // exponential damping rate for the internal playhead
 const SEEK_EPSILON = 0.034;      // seconds (~one frame at 30fps); below this we do not issue a new seek
 const SEEK_WATCHDOG_MS = 400;    // if `seeked` never arrives, release the lock rather than deadlock
 const SNAP_AFTER_S = 0.12;       // a gap this long (tab restore, long task) snaps instead of easing
 const TOUR_BASE_MS = 20000;      // 1x tour duration for the whole page
 const IDLE_FRAMES = 20;          // frames with nothing to do before the rAF loop parks itself
+const SCROLL_DAMP_PER_SEC = 11;  // easing rate for the shared playhead the whole page rides on
+const SCROLL_SETTLE_PX = 0.4;    // below this the eased position snaps to the real one
 const TINT_STEPS = 48;           // the tint sits under mix-blend-mode; quantise its repaints
 const TENSION_SAMPLES = 128;     // precomputed points along the SVG tension trace
 
@@ -284,7 +288,7 @@ class Component extends DCLogic {
   promptText = [
     'RECONSTRUCTION PROMPT — INTIA / AURA, THE PERFUME',
     '',
-    'SOURCE FILM: droplet-scrub.mp4 (served at /media/droplet-scrub.mp4). Continuous cinematic macro:',
+    'SOURCE FILM: droplet-scrub-1080.mp4 (at /media/droplet-scrub-1080.mp4). Cinematic macro:',
     'push toward the polished frosted-glass lip of a perfume flacon, an amber droplet elongates',
     'and releases, camera passes through the surface-tension membrane into the falling liquid,',
     'travels among marbling colour ribbons (fast pistachio-almond threads leading, coiling',
@@ -320,16 +324,25 @@ class Component extends DCLogic {
     '             weight and swaps the composition copy (the interactive element).',
     '  05 GLOW    commercial close: 50 ml / €25, wear counter, CTA, regulatory block, return.',
     '',
-    'SOURCE ENCODE — the film is cut for seeking, not for playback. 1280x720, 30 fps, H.264 high,',
-    'CRF 23, closed GOP of 6 frames (keyint = keyint_min = 6, sc_threshold 0, no B-frames), audio',
-    'stripped, moov atom at the front (+faststart). Scrubbing decodes from the nearest keyframe,',
-    'so GOP length — not frame rate — sets the cost of a seek: 5 P-frames of 720p instead of a',
-    '2-3 second 1080p60 GOP. A poster frame paints before the film arrives.',
+    'SOURCE ENCODE — the film is cut for seeking, not for playback. Native 1920x1080 at 60 fps,',
+    'H.264 high, CRF 22, closed GOP of 6 frames (keyint = keyint_min = 6, sc_threshold 0, no',
+    'B-frames), audio stripped, moov atom at the front (+faststart). Scrubbing decodes from the',
+    'nearest keyframe, so GOP length — not frame rate — sets the cost of a seek. Keyframe density',
+    'is close to free on this footage (GOP 6 costs 15% over GOP 30), so it buys seek speed without',
+    'buying blur. Resolution is never scaled below the master: the film reads soft the moment it',
+    'is. A 1280x720 30 fps cut is served to small and low-DPR screens only. 60 fps is not for',
+    'playback — it halves the scroll distance between frames, ~9px instead of ~19px. A poster',
+    'frame paints before the film arrives.',
     '',
     'SCROLL VIDEO ENGINE — native <video>, fixed full-viewport, object-fit cover, muted,',
     'playsInline, preload auto, disablePictureInPicture. Duration read from loadedmetadata,',
     'never hardcoded. Document progress sets a TARGET time only; ONE rAF loop eases an internal',
     'playhead toward it with frame-rate-independent exponential damping (rate 7.2/s) and parks',
+    'itself once nothing moves. On pointer devices one further eased position drives film, chapters',
+    'and rail together: native scroll keeps the scrollbar, keyboard, anchors and touch momentum,',
+    'and <main> is merely offset by how far the eased value trails it, so a wheel notch glides in',
+    'over ~180ms instead of snapping while the film slides separately. Off for touch and',
+    'reduced-motion.',
     'itself once nothing is moving. Scroll, resize and pointer events only wake that loop — they',
     'never run a frame synchronously, which would force layout inside the event and let the tour',
     'feed its own scrollTo back into itself. Never seek while the decoder is seeking — exactly one',
@@ -365,7 +378,13 @@ class Component extends DCLogic {
     this.running = false; this.idle = 0; this.needMeasure = false;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.touch = window.matchMedia('(hover: none)').matches;
+    // Touch already has momentum of its own and reduced-motion asks us not to add any, so the
+    // eased playhead is a pointer-device enhancement only.
+    this.smooth = !this.touch && !this.reduced;
+    this.smoothY = window.scrollY;
     this.loop = this.loop.bind(this);
+    this.main = document.querySelector('main');
+    if (this.main && this.smooth) this.main.style.willChange = 'transform';
 
     this.sections = Array.prototype.slice.call(document.querySelectorAll('[data-chapter]'));
     this.navItems = Array.prototype.slice.call(document.querySelectorAll('[data-navitem]'));
@@ -407,10 +426,11 @@ class Component extends DCLogic {
         // The element itself failed — a 404 on the direct path, or a stream it will not decode.
         // Walk the same candidate list before giving up on the film.
         const el = this.videoRef.current;
-        if (el && !this.blobUrl && this.srcIndex != null && this.srcIndex + 1 < FILM_SOURCES.length) {
+        const list = this.filmSources || [];
+        if (el && !this.blobUrl && this.srcIndex != null && this.srcIndex + 1 < list.length) {
           this.srcIndex++;
-          console.warn('[film] falling back to ' + FILM_SOURCES[this.srcIndex]);
-          el.src = FILM_SOURCES[this.srcIndex];
+          console.warn('[film] falling back to ' + list[this.srcIndex]);
+          el.src = list[this.srcIndex];
           el.load();
           return;
         }
@@ -516,31 +536,44 @@ class Component extends DCLogic {
   async loadFilm(v) {
     if (this.buffering) return;
     this.buffering = true;
+    const sources = this.filmSources = this.pickFilmSources();
     try {
-      for (let i = 0; i < FILM_SOURCES.length; i++) {
+      for (let i = 0; i < sources.length; i++) {
         try {
-          const url = await this.fetchAsBlob(FILM_SOURCES[i]);
+          const url = await this.fetchAsBlob(sources[i]);
           if (!this.mounted) { URL.revokeObjectURL(url); return; }
-          if (i > 0) console.warn('[film] using fallback ' + FILM_SOURCES[i] + ' — scrubbing will be heavier');
-          this.filmSrc = FILM_SOURCES[i];
+          if (i > 0) console.warn('[film] using fallback ' + sources[i] + ' — scrubbing will be heavier');
+          this.filmSrc = sources[i];
           this.blobUrl = url;
           v.src = url;
           v.load();
           return;
         } catch (e) {
-          console.warn('[film] ' + FILM_SOURCES[i] + ' unavailable: ' + e.message);
+          console.warn('[film] ' + sources[i] + ' unavailable: ' + e.message);
         }
       }
       // Nothing could be fetched at all (file://, CORS, fetch blocked). Hand the list to the
       // element and let its own error handler walk it. The page stays navigable either way.
       if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM STREAMING — SCRUB LIMITED';
       this.srcIndex = 0;
-      v.src = FILM_SOURCES[0];
+      v.src = sources[0];
       v.load();
     } finally {
       this.buffering = false;
       setTimeout(() => this.hideLoader(), 400);
     }
+  }
+
+  // The stage covers 104% of the viewport and the engine zooms it a further 1.1x at the top, so
+  // the film has to carry noticeably more pixels than the viewport itself before device pixel
+  // ratio is even applied. Anything under that budget takes the lighter cut.
+  pickFilmSources() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const effective = Math.round(window.innerWidth * 1.04 * 1.1 * dpr);
+    const all = FILM_LADDER.map(t => t.src);
+    const wanted = FILM_LADDER.filter(t => effective >= t.minEffectivePx).map(t => t.src);
+    const rest = all.filter(s => wanted.indexOf(s) < 0);
+    return wanted.concat(rest, FILM_FALLBACKS);
   }
 
   async fetchAsBlob(src) {
@@ -620,8 +653,23 @@ class Component extends DCLogic {
     if (this.needMeasure) { this.needMeasure = false; this.measure(); }
 
     const sy = window.scrollY;                            // the only forced layout read per frame
-    const p = Math.max(0, Math.min(1, sy / this.scrollMax));
-    let busy = p !== this.progress;
+    let busy = false;
+
+    // One eased position drives the film, the chapters and the rail together. Native scroll keeps
+    // the scrollbar, keyboard, anchors and touch momentum untouched — the content is merely
+    // offset by however far the eased position trails the real one, so a wheel notch (an instant
+    // ~100px jump) glides in rather than snapping while the film slides separately underneath.
+    if (!this.smooth) this.smoothY = sy;
+    else {
+      const ks = raw > SNAP_AFTER_S ? 1 : 1 - Math.exp(-SCROLL_DAMP_PER_SEC * dt);
+      this.smoothY += (sy - this.smoothY) * ks;
+      if (Math.abs(sy - this.smoothY) < SCROLL_SETTLE_PX) this.smoothY = sy;
+      else busy = true;
+    }
+    const ey = this.smoothY;
+
+    const p = Math.max(0, Math.min(1, ey / this.scrollMax));
+    if (p !== this.progress) busy = true;
     this.progress = p;
 
     if (this.duration) {
@@ -634,7 +682,7 @@ class Component extends DCLogic {
       this.doSeek(this.playhead);
     }
 
-    this.paint(p, sy);
+    this.paint(p, ey, sy);
     if (this.tourActive) { this.driveTour(); busy = true; }
 
     this.idle = busy ? 0 : this.idle + 1;
@@ -642,8 +690,15 @@ class Component extends DCLogic {
 
   /* Write-only pass. Every geometry value it needs was read in measure() or passed in,
      so nothing here interleaves a read with a write and forces synchronous layout. */
-  paint(p, sy) {
+  paint(p, ey, sy) {
     const vh = this.vh;
+
+    // Offset the content by how far the eased position trails the real scroll, so chapters and
+    // film ride the same playhead. Fixed chrome sits outside <main> and is unaffected.
+    if (this.main && this.smooth) {
+      const lag = (sy - ey).toFixed(2);
+      if (lag !== this.lastLag) { this.lastLag = lag; this.main.style.transform = 'translate3d(0,' + lag + 'px,0)'; }
+    }
 
     const v = this.videoRef.current;
     if (v) {
@@ -681,7 +736,7 @@ class Component extends DCLogic {
     }
     for (let i = 0; i < n; i++) {
       const m = this.metrics[i];
-      const center = m.top + m.h / 2 - sy;
+      const center = m.top + m.h / 2 - ey;
       const d = Math.abs(center - vh / 2) / vh;
       const o = Math.max(0, Math.min(1, 1.25 - d * 1.9));
       if (Math.abs(this.lastO[i] - o) < 0.004) continue;
