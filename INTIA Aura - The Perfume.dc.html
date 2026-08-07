@@ -225,7 +225,14 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
 /* Scroll-video engine constants */
-const FILM_SRC = 'media/droplet-scrub.mp4'; // 720p30, GOP 6, no audio — encoded for seeking, not playback
+/* Film candidates, best first. The scrub cut is the one worth having — 720p30 with a 6-frame
+   GOP, encoded for seeking rather than playback — but a host that has not picked it up yet must
+   still show a film, so the originals already sitting on the server follow it. */
+const FILM_SOURCES = [
+  'media/droplet-scrub.mp4',
+  'media/droplet-60fps.mp4',
+  'uploads/60fps.mp4'
+];
 const DAMP_PER_SEC = 7.2;        // exponential damping rate for the internal playhead
 const SEEK_EPSILON = 0.034;      // seconds (~one frame at 30fps); below this we do not issue a new seek
 const SEEK_WATCHDOG_MS = 400;    // if `seeked` never arrives, release the lock rather than deadlock
@@ -396,7 +403,20 @@ class Component extends DCLogic {
           if (el && el.buffered.length && el.duration) this.setBuffer(el.buffered.end(el.buffered.length - 1) / el.duration);
         } catch (e) { /* buffered may throw before metadata */ }
       };
-      this.onError = () => { if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM UNAVAILABLE — INTERFACE STILL NAVIGABLE'; setTimeout(() => this.hideLoader(), 1200); };
+      this.onError = () => {
+        // The element itself failed — a 404 on the direct path, or a stream it will not decode.
+        // Walk the same candidate list before giving up on the film.
+        const el = this.videoRef.current;
+        if (el && !this.blobUrl && this.srcIndex != null && this.srcIndex + 1 < FILM_SOURCES.length) {
+          this.srcIndex++;
+          console.warn('[film] falling back to ' + FILM_SOURCES[this.srcIndex]);
+          el.src = FILM_SOURCES[this.srcIndex];
+          el.load();
+          return;
+        }
+        if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM UNAVAILABLE — INTERFACE STILL NAVIGABLE';
+        setTimeout(() => this.hideLoader(), 1200);
+      };
       v.addEventListener('loadedmetadata', this.onMeta);
       v.addEventListener('seeked', this.onSeeked);
       v.addEventListener('progress', this.onProgress);
@@ -497,38 +517,47 @@ class Component extends DCLogic {
     if (this.buffering) return;
     this.buffering = true;
     try {
-      const res = await fetch(FILM_SRC);
-      if (!res.ok) throw new Error('fetch failed');
-      const total = Number(res.headers.get('content-length')) || 0;
-      const reader = res.body && res.body.getReader ? res.body.getReader() : null;
-      let blob;
-      if (reader) {
-        const chunks = []; let got = 0;
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value); got += value.length;
-          if (total) this.setBuffer(got / total);
+      for (let i = 0; i < FILM_SOURCES.length; i++) {
+        try {
+          const url = await this.fetchAsBlob(FILM_SOURCES[i]);
+          if (!this.mounted) { URL.revokeObjectURL(url); return; }
+          if (i > 0) console.warn('[film] using fallback ' + FILM_SOURCES[i] + ' — scrubbing will be heavier');
+          this.filmSrc = FILM_SOURCES[i];
+          this.blobUrl = url;
+          v.src = url;
+          v.load();
+          return;
+        } catch (e) {
+          console.warn('[film] ' + FILM_SOURCES[i] + ' unavailable: ' + e.message);
         }
-        blob = new Blob(chunks, { type: 'video/mp4' });
-      } else {
-        blob = await res.blob();
       }
-      if (!this.mounted) return;
-      this.blobUrl = URL.createObjectURL(blob);
-      this.setBuffer(1);
-      v.src = this.blobUrl;
-      v.load();
-    } catch (e) {
-      // file:// or a host that blocks fetch — let the element stream it itself and hope the
-      // range support is real. The page stays navigable either way.
+      // Nothing could be fetched at all (file://, CORS, fetch blocked). Hand the list to the
+      // element and let its own error handler walk it. The page stays navigable either way.
       if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM STREAMING — SCRUB LIMITED';
-      v.src = FILM_SRC;
+      this.srcIndex = 0;
+      v.src = FILM_SOURCES[0];
       v.load();
     } finally {
       this.buffering = false;
       setTimeout(() => this.hideLoader(), 400);
     }
+  }
+
+  async fetchAsBlob(src) {
+    const res = await fetch(src);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const total = Number(res.headers.get('content-length')) || 0;
+    const reader = res.body && res.body.getReader ? res.body.getReader() : null;
+    if (!reader) return URL.createObjectURL(await res.blob());
+    const chunks = []; let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value); got += value.length;
+      if (total) this.setBuffer(got / total);
+    }
+    this.setBuffer(1);
+    return URL.createObjectURL(new Blob(chunks, { type: 'video/mp4' }));
   }
 
   hideLoader() {
