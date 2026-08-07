@@ -328,11 +328,12 @@ class Component extends DCLogic {
     'feed its own scrollTo back into itself. Never seek while the decoder is seeking — exactly one',
     'seek in flight, newest target wins, released by `seeked` or requestVideoFrameCallback under a',
     'token so superseded callbacks cannot double-release, with a watchdog against a lost event.',
-    'Seek epsilon one frame. The element streams directly when the host honours byte ranges; only',
-    'if `seekable` comes back empty is the file pulled into a blob URL. Reads are batched into',
-    'measure(); paint() is write-only and skips unchanged values. Restrained loading overlay with',
-    'a buffered progress bar, desktop-only pointer parallax, graceful error handling,',
-    'reduced-motion respected.',
+    'Seek epsilon one frame. The whole file is buffered into a blob URL before the element is',
+    'wired up, because the served stream cannot be relied on to honour byte ranges; the decoder',
+    'is then primed with one muted play/pause and one real seek so Safari and iOS paint a frame',
+    'before the first scroll. Reads are batched into measure(); paint() is write-only and skips',
+    'unchanged values. Restrained loading overlay with a buffered progress bar, desktop-only',
+    'pointer parallax, graceful error handling, reduced-motion respected.',
     '',
     'AUTO TOUR — fixed pill control, bottom centre: Start Tour -> Pause -> Resume -> Replay, live',
     'percentage, Restart above 2%, 1x/2x toggle where 1x traverses the whole document in exactly',
@@ -383,13 +384,9 @@ class Component extends DCLogic {
         const el = this.videoRef.current;
         if (!el) return;
         this.duration = el.duration || 0;
-        // If the host honours byte ranges the element can seek natively and we are done.
-        // If it does not, `seekable` comes back empty (or short) and scrubbing is impossible —
-        // only then do we pay for pulling the whole file into a blob.
-        let seekable = false;
-        try { seekable = !!(el.seekable && el.seekable.length && el.seekable.end(el.seekable.length - 1) >= this.duration - 0.5); } catch (e) {}
-        if (seekable || this.blobUrl) { this.hideLoader(); this.wake(); }
-        else this.bufferFilm(el);
+        this.hideLoader();
+        this.primeDecoder(el);
+        this.wake();
       };
       this.onSeeked = () => this.endSeek(this.seekToken);
       this.onProgress = () => {
@@ -405,9 +402,7 @@ class Component extends DCLogic {
       v.addEventListener('progress', this.onProgress);
       v.addEventListener('error', this.onError);
       this.loaderTimeout = setTimeout(() => this.hideLoader(), 12000);
-      v.src = FILM_SRC;
-      v.load();
-      if (v.readyState >= 1) this.onMeta();
+      this.loadFilm(v);
     }
 
     // Scroll only wakes the loop. It never runs a frame synchronously: doing that from the
@@ -478,7 +473,27 @@ class Component extends DCLogic {
     if (b) b.style.right = (100 - Math.max(0, Math.min(1, f)) * 100).toFixed(1) + '%';
   }
 
-  async bufferFilm(v) {
+  // A <video> that has never played will not paint a frame from a currentTime change in Safari
+  // and iOS, and the poster stays up until something is painted — which reads as a dead film.
+  // One muted play/pause plus a single real seek guarantees the decoder is live before the
+  // first scroll. Both are no-ops where they are not needed.
+  primeDecoder(v) {
+    if (this.primed || !this.duration) return;
+    this.primed = true;
+    try {
+      const pr = v.play();
+      if (pr && pr.catch) pr.catch(() => {}); // pausing on the next line rejects the promise
+      v.pause();
+    } catch (e) { /* autoplay refused — the seek below still forces a decode */ }
+    try {
+      if (v.currentTime < 0.04) { v.currentTime = 0.04; this.playhead = 0.04; }
+    } catch (e) {}
+  }
+
+  // Buffer the file before wiring it up. The served stream cannot be relied on to honour byte
+  // ranges — `seekable` is reported optimistically at loadedmetadata and only fails once a real
+  // seek goes out, by which point the film is stuck. At 3.3 MB the buffer is cheap insurance.
+  async loadFilm(v) {
     if (this.buffering) return;
     this.buffering = true;
     try {
@@ -502,16 +517,17 @@ class Component extends DCLogic {
       if (!this.mounted) return;
       this.blobUrl = URL.createObjectURL(blob);
       this.setBuffer(1);
-      const at = v.currentTime;
       v.src = this.blobUrl;
       v.load();
-      const resume = () => { v.removeEventListener('loadedmetadata', resume); try { v.currentTime = at; } catch (e) {} this.wake(); };
-      v.addEventListener('loadedmetadata', resume);
     } catch (e) {
+      // file:// or a host that blocks fetch — let the element stream it itself and hope the
+      // range support is real. The page stays navigable either way.
       if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM STREAMING — SCRUB LIMITED';
+      v.src = FILM_SRC;
+      v.load();
     } finally {
       this.buffering = false;
-      this.hideLoader();
+      setTimeout(() => this.hideLoader(), 400);
     }
   }
 
