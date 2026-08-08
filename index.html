@@ -295,17 +295,24 @@
    and low-DPR screens take the lighter cut. The originals already on the server trail both, so
    a host that has not picked up the new files still shows a film. */
 const FILM_LADDER = [
-  { minEffectivePx: 1280, src: 'media/droplet-scrub-1080.mp4' },
-  { minEffectivePx: 0,    src: 'media/droplet-scrub-720.mp4' }
+  { minEffectivePx: 1280, src: 'media/droplet-scrub-1080.mp4', fps: 60 },
+  { minEffectivePx: 0,    src: 'media/droplet-scrub-720.mp4', fps: 30 }
 ];
-const FILM_FALLBACKS = ['media/droplet-60fps.mp4', 'uploads/60fps.mp4'];
+const FILM_FALLBACKS = [
+  { src: 'media/droplet-60fps.mp4', fps: 60 },
+  { src: 'uploads/60fps.mp4', fps: 60 }
+];
 const DAMP_PER_SEC = 7.2;        // exponential damping rate for the internal playhead
-const SEEK_EPSILON = 0.034;      // seconds (~one frame at 30fps); below this we do not issue a new seek
+const SEEK_EPSILON_DEFAULT = 0.034; // fallback (~one frame at 30fps) until the real fps is known
 const SEEK_WATCHDOG_MS = 400;    // if `seeked` never arrives, release the lock rather than deadlock
 const SNAP_AFTER_S = 0.12;       // a gap this long (tab restore, long task) snaps instead of easing
 const TOUR_BASE_MS = 20000;      // 1x tour duration for the whole page
 const IDLE_FRAMES = 20;          // frames with nothing to do before the rAF loop parks itself
 const SCROLL_DAMP_PER_SEC = 11;  // easing rate for the shared playhead the whole page rides on
+const FOLLOW_K = 6;              // proportional gain: target/currentTime gap -> playbackRate
+const FOLLOW_MIN_RATE = 0.0625;  // HTMLMediaElement's practical minimum playbackRate
+const FOLLOW_MAX_RATE = 4;       // and its practical maximum
+const FOLLOW_MAX_ERROR_S = 0.5;  // a gap this large is a scrub, not a following error — seek instead
 const SCROLL_SETTLE_PX = 0.4;    // below this the eased position snaps to the real one
 const TINT_STEPS = 48;           // the tint sits under mix-blend-mode; quantise its repaints
 const TENSION_SAMPLES = 128;     // precomputed points along the SVG tension trace
@@ -439,6 +446,11 @@ class Component extends DCLogic {
     this.mounted = true;
     this.playhead = 0; this.target = 0; this.seeking = false; this.pending = null; this.seekToken = 0;
     this.duration = 0; this.progress = -1; this.pointer = { x: 0, y: 0 };
+    this.seekEpsilon = SEEK_EPSILON_DEFAULT;
+    this.lastFollowTarget = 0;
+    this.fpsBySrc = {};
+    FILM_LADDER.forEach(t => { this.fpsBySrc[t.src] = t.fps; });
+    FILM_FALLBACKS.forEach(f => { this.fpsBySrc[f.src] = f.fps; });
     this.running = false; this.idle = 0; this.needMeasure = false;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.touch = window.matchMedia('(hover: none)').matches;
@@ -474,6 +486,10 @@ class Component extends DCLogic {
         const el = this.videoRef.current;
         if (!el) return;
         this.duration = el.duration || 0;
+        // 1080p is 60fps, 720p is 30fps: an epsilon sized for 30fps throws away half the
+        // temporal resolution the 1080p cut actually offers, so size it to the cut in play.
+        this.fps = this.fpsBySrc[this.filmSrc] || 30;
+        this.seekEpsilon = (1 / this.fps) * 0.9;
         this.hideLoader();
         this.primeDecoder(el);
         this.wake();
@@ -493,6 +509,7 @@ class Component extends DCLogic {
         const list = this.filmSources || [];
         if (el && !this.blobUrl && this.srcIndex != null && this.srcIndex + 1 < list.length) {
           this.srcIndex++;
+          this.filmSrc = list[this.srcIndex];
           console.warn('[film] falling back to ' + list[this.srcIndex]);
           el.src = list[this.srcIndex];
           el.load();
@@ -526,7 +543,11 @@ class Component extends DCLogic {
       if (['PageUp', 'PageDown', 'Home', 'End', ' ', 'ArrowUp', 'ArrowDown'].indexOf(e.key) > -1) this.pauseTour();
     };
     this.onVis = () => {
-      if (document.hidden) { this.running = false; cancelAnimationFrame(this.raf); }
+      if (document.hidden) {
+        this.running = false; cancelAnimationFrame(this.raf);
+        const v = this.videoRef.current;
+        if (v && !v.paused) v.pause(); // the rAF loop that would otherwise pause the follower is stopping
+      }
       else { this.needMeasure = true; this.wake(); }
     };
     document.addEventListener('visibilitychange', this.onVis);
@@ -558,6 +579,7 @@ class Component extends DCLogic {
       v.removeEventListener('seeked', this.onSeeked);
       v.removeEventListener('progress', this.onProgress);
       v.removeEventListener('error', this.onError);
+      if (!v.paused) v.pause();
       v.removeAttribute('src');
       v.load();
     }
@@ -620,6 +642,7 @@ class Component extends DCLogic {
       // element and let its own error handler walk it. The page stays navigable either way.
       if (this.loadLabelRef.current) this.loadLabelRef.current.textContent = 'FILM STREAMING — SCRUB LIMITED';
       this.srcIndex = 0;
+      this.filmSrc = sources[0];
       v.src = sources[0];
       v.load();
     } finally {
@@ -637,7 +660,7 @@ class Component extends DCLogic {
     const all = FILM_LADDER.map(t => t.src);
     const wanted = FILM_LADDER.filter(t => effective >= t.minEffectivePx).map(t => t.src);
     const rest = all.filter(s => wanted.indexOf(s) < 0);
-    return wanted.concat(rest, FILM_FALLBACKS);
+    return wanted.concat(rest, FILM_FALLBACKS.map(f => f.src));
   }
 
   async fetchAsBlob(src) {
@@ -668,7 +691,7 @@ class Component extends DCLogic {
     if (!v || !this.duration) return;
     const clamped = Math.max(0, Math.min(this.duration - 0.02, t));
     if (this.seeking) { this.pending = clamped; return; }
-    if (Math.abs(clamped - v.currentTime) < SEEK_EPSILON) return;
+    if (Math.abs(clamped - v.currentTime) < this.seekEpsilon) return;
 
     this.seeking = true;
     const token = ++this.seekToken;
@@ -676,6 +699,42 @@ class Component extends DCLogic {
     this.seekWatchdog = setTimeout(() => this.endSeek(token), SEEK_WATCHDOG_MS);
     try { v.currentTime = clamped; } catch (e) { this.endSeek(token); return; }
     if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => this.endSeek(token));
+  }
+
+  // Forward motion (ordinary reading, the auto tour) never needs a seek at all: let the element
+  // play and steer playbackRate so it converges on the scroll-derived target. The decoder then
+  // runs its normal, uninterrupted pipeline instead of flushing and re-decoding from a keyframe
+  // on every frame. Backward motion and jumps bigger than half a second still fall through to
+  // the seek pump above, which is exactly today's behaviour for a scrub.
+  driveFilm(target) {
+    const v = this.videoRef.current;
+    if (!v || !this.duration) return;
+    const cur = v.currentTime;
+    const error = target - cur;
+    const advancing = Math.abs(target - this.lastFollowTarget) > 1e-4;
+    this.lastFollowTarget = target;
+
+    // Symmetric threshold, not "any negative error": most forward motion is slower than 1x
+    // real-time (a 20s tour crossing an 8s film needs a steady ~0.4 rate), so the element being
+    // a little ahead of target is the normal, converged state under proportional control, not a
+    // scrub. Only a gap bigger than half a second in either direction is a genuine jump/reversal
+    // that a seek should handle.
+    if (Math.abs(error) > FOLLOW_MAX_ERROR_S) {
+      if (!v.paused) v.pause();
+      this.doSeek(target);
+      return;
+    }
+    // Caught up (or already past, which the symmetric check above would have corrected if it
+    // mattered) and the target has stopped moving: stop, don't idle-drift the decoder forward.
+    if (!advancing && error <= this.seekEpsilon) {
+      if (!v.paused) v.pause();
+      return;
+    }
+    const rate = Math.max(FOLLOW_MIN_RATE, Math.min(FOLLOW_MAX_RATE, 1 + error * FOLLOW_K));
+    if (v.paused) {
+      try { const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {}
+    }
+    if (Math.abs(v.playbackRate - rate) > 0.01) { try { v.playbackRate = rate; } catch (e) {} }
   }
 
   endSeek(token) {
@@ -741,9 +800,9 @@ class Component extends DCLogic {
       // A long gap (tab restore, blocking task) snaps rather than easing through 8 s of film.
       const k = raw > SNAP_AFTER_S ? 1 : 1 - Math.exp(-DAMP_PER_SEC * dt);
       this.playhead += (this.target - this.playhead) * k;
-      if (Math.abs(this.target - this.playhead) < SEEK_EPSILON * 0.5) this.playhead = this.target;
+      if (Math.abs(this.target - this.playhead) < this.seekEpsilon * 0.5) this.playhead = this.target;
       else busy = true;
-      this.doSeek(this.playhead);
+      this.driveFilm(this.playhead);
     }
 
     this.paint(p, ey, sy);
@@ -878,8 +937,16 @@ class Component extends DCLogic {
     this.setState({ tour: 'running' });
     this.wake();
   }
-  pauseTour() { if (this.tourActive) { this.tourActive = false; this.setState({ tour: 'paused' }); } }
-  stopTour() { this.tourActive = false; this.setState({ tour: 'idle' }); }
+  pauseTour() {
+    if (this.tourActive) {
+      this.tourActive = false; this.setState({ tour: 'paused' });
+      const v = this.videoRef.current; if (v && !v.paused) v.pause();
+    }
+  }
+  stopTour() {
+    this.tourActive = false; this.setState({ tour: 'idle' });
+    const v = this.videoRef.current; if (v && !v.paused) v.pause();
+  }
 
   renderVals() {
     const self = this;
