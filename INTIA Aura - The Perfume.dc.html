@@ -102,6 +102,7 @@
 
   <div data-stage="" style="position:fixed;inset:0;z-index:0;background:#1c1c1e;overflow:hidden">
     <video ref="{{ videoRef }}" muted="" playsinline="" preload="auto" poster="media/droplet-poster.jpg" disablepictureinpicture="" aria-hidden="true" style="position:absolute;top:50%;left:50%;width:104%;height:104%;transform:translate(-50%,-50%);object-fit:cover;will-change:transform;backface-visibility:hidden"></video>
+    <canvas ref="{{ canvasRef }}" aria-hidden="true" style="position:absolute;top:50%;left:50%;width:104%;height:104%;transform:translate(-50%,-50%);object-fit:cover;will-change:transform;backface-visibility:hidden;display:none"></canvas>
     <div data-vignette="" aria-hidden="true" style="position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,rgba(28,28,30,0) 35%,rgba(28,28,30,.62) 82%,rgba(28,28,30,.92) 100%);will-change:opacity"></div>
     <div aria-hidden="true" style="position:absolute;inset:0;background:linear-gradient(100deg,rgba(28,28,30,.8) 0%,rgba(28,28,30,.56) 34%,rgba(28,28,30,.12) 62%,rgba(28,28,30,0) 82%)"></div>
     <div data-tint="" aria-hidden="true" style="position:absolute;inset:0;background:#b07a46;opacity:.1;mix-blend-mode:soft-light;will-change:opacity"></div>
@@ -316,11 +317,267 @@ const FOLLOW_MAX_ERROR_S = 0.5;  // a gap this large is a scrub, not a following
 const SCROLL_SETTLE_PX = 0.4;    // below this the eased position snaps to the real one
 const TINT_STEPS = 48;           // the tint sits under mix-blend-mode; quantise its repaints
 const TENSION_SAMPLES = 128;     // precomputed points along the SVG tension trace
+const RESTART_GAP = 14;          // frames the playhead may outrun the decoder before a keyframe restart
+const BACK_PREROLL = 0;          // decoder reset measures ~0.09ms, so the nearest keyframe is always cheapest
+const FAST_STEP = 4;             // frames/tick above which we land on keyframes instead of exact frames
+const FRAME_CACHE = 48;          // decoded frames held; VideoFrames are GPU memory and must be closed
+
+/* ---------------------------------------------------------------------------
+   Minimal MP4 sample-table reader.
+
+   Only what a scrubber needs: the avcC decoder config and, per frame, its byte
+   range and whether it is a keyframe. The film is encoded with -bf 0, so decode
+   order equals presentation order and no ctts reordering is required — which is
+   the only reason this fits in a page instead of pulling in a demuxer library.
+   --------------------------------------------------------------------------- */
+function demuxMp4(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  const box = (start, end, path) => {
+    let pos = start;
+    while (pos + 8 <= end) {
+      let size = dv.getUint32(pos), type = String.fromCharCode(u8[pos+4], u8[pos+5], u8[pos+6], u8[pos+7]), hdr = 8;
+      if (size === 1) { size = Number(dv.getBigUint64(pos + 8)); hdr = 16; }
+      if (size === 0) size = end - pos;
+      if (size < 8) break;
+      if (type === path[0]) {
+        if (path.length === 1) return { start: pos + hdr, end: pos + size };
+        const inner = box(pos + hdr, pos + size, path.slice(1));
+        if (inner) return inner;
+      }
+      pos += size;
+    }
+    return null;
+  };
+  // Walk every trak and keep the one whose handler is 'vide'.
+  let trak = null;
+  const moov = box(0, buf.byteLength, ['moov']);
+  if (!moov) throw new Error('no moov');
+  let p = moov.start;
+  while (p + 8 <= moov.end) {
+    const size = dv.getUint32(p), type = String.fromCharCode(u8[p+4], u8[p+5], u8[p+6], u8[p+7]);
+    if (size < 8) break;
+    if (type === 'trak') {
+      const hdlr = box(p + 8, p + size, ['mdia', 'hdlr']);
+      if (hdlr && String.fromCharCode(u8[hdlr.start+8], u8[hdlr.start+9], u8[hdlr.start+10], u8[hdlr.start+11]) === 'vide') { trak = { start: p + 8, end: p + size }; break; }
+    }
+    p += size;
+  }
+  if (!trak) throw new Error('no video track');
+
+  const stbl = box(trak.start, trak.end, ['mdia', 'minf', 'stbl']);
+  const mdhd = box(trak.start, trak.end, ['mdia', 'mdhd']);
+  if (!stbl || !mdhd) throw new Error('no stbl');
+  const mdVer = u8[mdhd.start];
+  const timescale = mdVer === 0 ? dv.getUint32(mdhd.start + 12) : dv.getUint32(mdhd.start + 20);
+
+  const stsd = box(stbl.start, stbl.end, ['stsd']);
+  if (!stsd) throw new Error('no stsd');
+  const entry = stsd.start + 8;                              // version/flags + entry_count
+  const fmt = String.fromCharCode(u8[entry+4], u8[entry+5], u8[entry+6], u8[entry+7]);
+  const codedWidth = dv.getUint16(entry + 32), codedHeight = dv.getUint16(entry + 34);
+  const avcC = box(entry + 86, stsd.end, ['avcC']);          // sample entry header is 86 bytes
+  if (fmt !== 'avc1' || !avcC) throw new Error('not avc1');
+  const description = u8.slice(avcC.start, avcC.end);
+  const codec = 'avc1.' + [description[1], description[2], description[3]]
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const list = (name, reader) => {
+    const b = box(stbl.start, stbl.end, [name]);
+    if (!b) return [];
+    const n = dv.getUint32(b.start + 4), out = [];
+    for (let i = 0; i < n; i++) out.push(reader(b.start + 8, i));
+    return out;
+  };
+  const stts = list('stts', (o, i) => ({ count: dv.getUint32(o + i*8), delta: dv.getUint32(o + i*8 + 4) }));
+  const stsc = list('stsc', (o, i) => ({ first: dv.getUint32(o + i*12), per: dv.getUint32(o + i*12 + 4) }));
+  const stco = box(stbl.start, stbl.end, ['stco']);
+  const co64 = box(stbl.start, stbl.end, ['co64']);
+  const chunks = [];
+  if (stco) { const n = dv.getUint32(stco.start + 4); for (let i = 0; i < n; i++) chunks.push(dv.getUint32(stco.start + 8 + i*4)); }
+  else if (co64) { const n = dv.getUint32(co64.start + 4); for (let i = 0; i < n; i++) chunks.push(Number(dv.getBigUint64(co64.start + 8 + i*8))); }
+  const stszB = box(stbl.start, stbl.end, ['stsz']);
+  if (!stszB) throw new Error('no stsz');
+  const uniform = dv.getUint32(stszB.start + 4), sampleCount = dv.getUint32(stszB.start + 8);
+  const sizes = [];
+  for (let i = 0; i < sampleCount; i++) sizes.push(uniform || dv.getUint32(stszB.start + 12 + i*4));
+  const stssB = box(stbl.start, stbl.end, ['stss']);
+  const keys = new Set();
+  if (stssB) { const n = dv.getUint32(stssB.start + 4); for (let i = 0; i < n; i++) keys.add(dv.getUint32(stssB.start + 8 + i*4) - 1); }
+
+  // Expand stsc, then walk chunks accumulating byte offsets per sample.
+  const samples = [];
+  let si = 0;
+  for (let c = 0; c < chunks.length && si < sampleCount; c++) {
+    let per = stsc.length ? stsc[0].per : 1;
+    for (let e = 0; e < stsc.length; e++) if (c + 1 >= stsc[e].first) per = stsc[e].per;
+    let off = chunks[c];
+    for (let k = 0; k < per && si < sampleCount; k++, si++) {
+      samples.push({ offset: off, size: sizes[si], key: stssB ? keys.has(si) : true });
+      off += sizes[si];
+    }
+  }
+  // Uniform frame duration (stts is a single run for a CFR encode).
+  const delta = stts.length ? stts[0].delta : 1;
+  return { codec, description, codedWidth, codedHeight, samples, timescale,
+           frameDurUs: (delta / timescale) * 1e6, fps: timescale / delta };
+}
+
+/* ---------------------------------------------------------------------------
+   Canvas film. Decodes frames directly instead of seeking the media element.
+
+   Setting video.currentTime flushes and re-primes the decoder — measured at
+   ~105ms per seek on this 1080p60 file, which caps the film at ~9.5 visual
+   updates a second no matter how short the GOP is. Feeding a VideoDecoder
+   avoids the flush entirely: forward motion is a continuous decode, and a jump
+   backwards costs one keyframe plus at most five P-frames.
+   --------------------------------------------------------------------------- */
+class CanvasFilm {
+  constructor(buf, info, canvas) {
+    this.buf = buf; this.info = info; this.canvas = canvas;
+    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    this.cache = new Map();          // frame index -> VideoFrame
+    this.fedTo = -1; this.fedFrom = 0; this.needsKey = true; this.decodedTo = -1;
+    this.drawn = -1; this.failed = false;
+  }
+  get frameCount() { return this.info.samples.length; }
+  fail(msg) { if (!this.failed) { this.failed = true; this.errMsg = msg; } }
+
+  // No hardwareAcceleration hint: 'prefer-hardware' is reported unsupported wherever there is
+  // no GPU, and the default lets the browser take hardware when it exists and software when it
+  // does not. The config below is the exact object the self-test validates.
+  get config() {
+    return {
+      codec: this.info.codec, description: this.info.description,
+      codedWidth: this.info.codedWidth, codedHeight: this.info.codedHeight,
+      optimizeForLatency: true
+    };
+  }
+
+  // configure() and flush() both leave the decoder demanding a keyframe before any delta.
+  configure() { this.decoder.configure(this.config); this.needsKey = true; }
+
+  async init() {
+    if (typeof VideoDecoder === 'undefined') throw new Error('no VideoDecoder');
+    const support = await VideoDecoder.isConfigSupported(this.config);
+    if (!support || !support.supported) throw new Error('codec unsupported: ' + this.info.codec);
+    this.decoder = new VideoDecoder({
+      output: f => {
+        const idx = Math.round(f.timestamp / this.info.frameDurUs);
+        const old = this.cache.get(idx);
+        if (old) old.close();
+        this.cache.set(idx, f);
+        if (idx > this.decodedTo) this.decodedTo = idx;
+      },
+      error: e => this.fail('decoder: ' + ((e && e.message) || 'error'))
+    });
+    this.configure();
+    this.canvas.width = this.info.codedWidth;
+    this.canvas.height = this.info.codedHeight;
+    // Prove the pipeline end to end before anything is swapped in.
+    this.ensure(0);
+    await this.decoder.flush();
+    if (this.failed || !this.cache.has(0)) throw new Error('decode self-test failed: ' + (this.errMsg || 'no frame'));
+    this.needsKey = true;          // flush() consumed the keyframe state
+    this.fedFrom = 0; this.fedTo = -1;
+    return this;
+  }
+
+  keyAtOrBefore(i) {
+    for (let k = Math.min(i, this.frameCount - 1); k >= 0; k--) if (this.info.samples[k].key) return k;
+    return 0;
+  }
+
+  // Feed chunks so that `target` (plus a little lookahead) will be decoded.
+  ensure(target, lookahead, dir) {
+    if (this.failed) return;
+    const n = this.frameCount;
+    target = Math.max(0, Math.min(n - 1, target));
+    if (this.cache.has(target) && this.fedTo >= target + (lookahead || 0)) return;
+    // Restart from a keyframe only when the target is BEHIND the fed run, or far enough
+    // ahead that decoding the intervening frames would cost more than a restart. A small
+    // forward overrun is normal and must not reset: the stream is contiguous, so we simply
+    // feed on. Resetting on every overrun discards the whole queued decode, which starves
+    // the cache exactly when the playhead is moving fastest.
+    // The decoder refuses a delta frame while it is waiting for a keyframe, so a pending
+    // keyframe requirement forces a restart just as a backward jump does.
+    const nextIsKey = this.fedTo + 1 < n && this.info.samples[this.fedTo + 1].key;
+    if (target < this.fedFrom || target > this.decodedTo + RESTART_GAP || (this.needsKey && !nextIsKey)) {
+      // A reset costs ~0.09ms while a frame costs 10-16ms in software, so the cheapest restart
+      // is always the nearest keyframe: decode as few frames as possible, never pre-roll.
+      const from = dir < 0 ? Math.max(0, target - BACK_PREROLL) : target;
+      const k = this.keyAtOrBefore(from);
+      try { this.decoder.reset(); this.configure(); } catch (e) { this.fail('reset/configure: ' + e.message); return; }
+      this.fedFrom = k; this.fedTo = k - 1; this.decodedTo = k - 1;
+    }
+    const want = Math.min(n - 1, target + (lookahead || 0));
+    // Do not outrun the decoder; a deep queue only adds latency.
+    while (this.fedTo < want && this.decoder.decodeQueueSize < 40) {
+      const i = ++this.fedTo, s = this.info.samples[i];
+      try {
+        this.decoder.decode(new EncodedVideoChunk({
+          type: s.key ? 'key' : 'delta',
+          timestamp: Math.round(i * this.info.frameDurUs),
+          duration: Math.round(this.info.frameDurUs),
+          data: new Uint8Array(this.buf, s.offset, s.size)
+        }));
+      } catch (e) { this.fail('decode: ' + e.message); return; }
+      if (s.key) this.needsKey = false;
+    }
+  }
+
+  // Nearest decoded frame at or before the target, so the canvas always has something.
+  best(target) {
+    if (this.cache.has(target)) return target;
+    for (let d = 1; d <= 12; d++) {
+      if (this.cache.has(target - d)) return target - d;
+      if (this.cache.has(target + d)) return target + d;
+    }
+    return -1;
+  }
+
+  show(timeSec, lookahead) {
+    if (this.failed) return false;
+    let idx = Math.max(0, Math.min(this.frameCount - 1, Math.round(timeSec * this.info.fps)));
+    const dir = idx >= this.lastIdx ? 1 : -1;   // keep the cache ahead of travel, not behind it
+    // When the playhead outruns the decoder, land on keyframes: one I-frame decode instead of a
+    // keyframe plus its dependent P-frames, roughly a sixth of the work. At that speed the exact
+    // frame is not perceivable anyway — what matters is that the picture keeps moving.
+    if (Math.abs(idx - this.lastIdx) > FAST_STEP) idx = this.keyAtOrBefore(idx);
+    this.lastIdx = idx;
+    this.ensure(idx, lookahead, dir);
+    const use = this.best(idx);
+    if (use >= 0 && use !== this.drawn) {
+      const f = this.cache.get(use);
+      try { this.ctx.drawImage(f, 0, 0, this.canvas.width, this.canvas.height); this.drawn = use; }
+      catch (e) { this.fail('draw: ' + e.message); return false; }
+    }
+    this.trim(idx, dir);   // always: a stalled lookup must not let the cache grow unbounded
+    return use >= 0;
+  }
+
+  // VideoFrames hold GPU memory and must be closed explicitly.
+  // Asymmetric around the playhead, biased the way it is travelling: scrolling back up needs
+  // the frames BELOW the playhead, and a window biased forwards discards them on arrival.
+  trim(around, dir) {
+    if (this.cache.size <= FRAME_CACHE) return;
+    const lo = around - (dir < 0 ? 30 : 10), hi = around + (dir < 0 ? 10 : 30);
+    for (const [i, f] of this.cache) {
+      if (i < lo || i > hi) { f.close(); this.cache.delete(i); }
+    }
+  }
+
+  destroy() {
+    for (const [, f] of this.cache) { try { f.close(); } catch (e) {} }
+    this.cache.clear();
+    try { this.decoder.close(); } catch (e) {}
+  }
+}
 
 class Component extends DCLogic {
   state = { note: 0, tour: 'idle', speed: 1, pct: 0, promptOpen: false, copied: false };
 
   videoRef = React.createRef();
+  canvasRef = React.createRef();
   loaderRef = React.createRef();
   bufferRef = React.createRef();
   loadLabelRef = React.createRef();
@@ -492,6 +749,7 @@ class Component extends DCLogic {
         this.seekEpsilon = (1 / this.fps) * 0.9;
         this.hideLoader();
         this.primeDecoder(el);
+        this.startCanvasFilm();
         this.wake();
       };
       this.onSeeked = () => this.endSeek(this.seekToken);
@@ -573,6 +831,7 @@ class Component extends DCLogic {
     clearTimeout(this.loaderTimeout);
     clearTimeout(this.seekWatchdog);
     if (this.ro) { this.ro.disconnect(); this.ro = null; }
+    if (this.film) { try { this.film.destroy(); } catch (e) {} this.film = null; }
     const v = this.videoRef.current;
     if (v) {
       v.removeEventListener('loadedmetadata', this.onMeta);
@@ -651,6 +910,31 @@ class Component extends DCLogic {
     }
   }
 
+  // Try to take over from the media element. Nothing is swapped in until a frame has actually
+  // been decoded, so an unsupported codec, a missing VideoDecoder or any decode error simply
+  // leaves the <video> path running exactly as before.
+  async startCanvasFilm() {
+    if (this.film || this.filmTried || !this.filmBuffer) return;
+    this.filmTried = true;
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+    try {
+      const info = demuxMp4(this.filmBuffer);
+      if (info.fps > 0) { this.fps = info.fps; this.seekEpsilon = (1 / info.fps) * 0.9; }
+      const film = await new CanvasFilm(this.filmBuffer, info, canvas).init();
+      if (!this.mounted) { film.destroy(); return; }
+      this.film = film;
+      this.frameCount = info.frameCount || info.samples.length;
+      film.show(this.playhead, 6);
+      canvas.style.display = 'block';
+      const v = this.videoRef.current;
+      if (v) { try { v.pause(); } catch (e) {} v.style.display = 'none'; }
+      this.wake();
+    } catch (e) {
+      console.warn('[film] canvas path unavailable (' + e.message + ') — using media-element seeking');
+    }
+  }
+
   // The stage covers 104% of the viewport and the engine zooms it a further 1.1x at the top, so
   // the film has to carry noticeably more pixels than the viewport itself before device pixel
   // ratio is even applied. Anything under that budget takes the lighter cut.
@@ -668,7 +952,7 @@ class Component extends DCLogic {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const total = Number(res.headers.get('content-length')) || 0;
     const reader = res.body && res.body.getReader ? res.body.getReader() : null;
-    if (!reader) return URL.createObjectURL(await res.blob());
+    if (!reader) { const b = await res.blob(); this.filmBuffer = await b.arrayBuffer(); return URL.createObjectURL(b); }
     const chunks = []; let got = 0;
     for (;;) {
       const { done, value } = await reader.read();
@@ -677,7 +961,9 @@ class Component extends DCLogic {
       if (total) this.setBuffer(got / total);
     }
     this.setBuffer(1);
-    return URL.createObjectURL(new Blob(chunks, { type: 'video/mp4' }));
+    const blob = new Blob(chunks, { type: 'video/mp4' });
+    this.filmBuffer = await blob.arrayBuffer();   // the demuxer reads this; no second fetch
+    return URL.createObjectURL(blob);
   }
 
   hideLoader() {
@@ -735,6 +1021,18 @@ class Component extends DCLogic {
       try { const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {}
     }
     if (Math.abs(v.playbackRate - rate) > 0.01) { try { v.playbackRate = rate; } catch (e) {} }
+  }
+
+  // A decoder error mid-session hands the film back to the media element rather than
+  // leaving a frozen canvas on screen.
+  revertToVideo() {
+    if (!this.film) return;
+    console.warn('[film] decoder failed (' + (this.film.errMsg || 'unknown') + ') — reverting to media-element seeking');
+    try { this.film.destroy(); } catch (e) {}
+    this.film = null;
+    const c = this.canvasRef.current, v = this.videoRef.current;
+    if (c) c.style.display = 'none';
+    if (v) { v.style.display = ''; try { v.playbackRate = 1; v.currentTime = this.playhead; } catch (e) {} }
   }
 
   endSeek(token) {
@@ -802,7 +1100,14 @@ class Component extends DCLogic {
       this.playhead += (this.target - this.playhead) * k;
       if (Math.abs(this.target - this.playhead) < this.seekEpsilon * 0.5) this.playhead = this.target;
       else busy = true;
-      this.driveFilm(this.playhead);
+      if (this.film) {
+        // Look ahead in the direction of travel so the decoder is always a few frames
+        // in front of the playhead rather than being chased by it.
+        if (!this.film.failed) this.film.show(this.playhead, this.target >= this.playhead ? 20 : 2);
+        if (this.film.failed) this.revertToVideo();   // must also catch a film that failed earlier
+      }
+      // No canvas decoder: the media element follows by playbackRate rather than seeking.
+      if (!this.film) this.driveFilm(this.playhead);
     }
 
     this.paint(p, ey, sy);
@@ -967,7 +1272,7 @@ class Component extends DCLogic {
       go: () => { const el = self.sections && self.sections[i + 1] ? self.sections[i + 1] : self.sections[i]; if (el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top, behavior: self.reduced ? 'auto' : 'smooth' }); }
     }));
     return {
-      rootRef: this.rootRef, videoRef: this.videoRef, loaderRef: this.loaderRef, bufferRef: this.bufferRef,
+      rootRef: this.rootRef, videoRef: this.videoRef, canvasRef: this.canvasRef, loaderRef: this.loaderRef, bufferRef: this.bufferRef,
       loadLabelRef: this.loadLabelRef, meniscusRef: this.meniscusRef, doseRef: this.doseRef,
       tensionRef: this.tensionRef, tensionDotRef: this.tensionDotRef, editionRef: this.editionRef,
       tourPctRef: this.tourPctRef, promptRef: this.promptRef,
