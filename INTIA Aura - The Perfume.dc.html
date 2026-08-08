@@ -31,6 +31,70 @@
   :focus-visible { outline: 1px solid #c29283; outline-offset: 3px; }
   @keyframes om-drift { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .001ms !important; } }
+
+  /* ---------------------------------------------------------------------------
+     Handset layout. Everything below is inside a max-width query, so the desktop
+     composition is untouched by construction. The page is authored in inline
+     styles, so overriding them needs !important — that is the cost of scoping
+     rather than rewriting.
+     --------------------------------------------------------------------------- */
+  @media (max-width: 700px) {
+
+    /* The chapter rail's labels overprint the headline and the chapter 01 stats at
+       this width. Keep the rail and the travelling bead — they carry the meniscus
+       idea — but drop the words and leave the numerals. */
+    nav[aria-label="Chapters"] { right: 4px !important; }
+    nav[aria-label="Chapters"] > div { gap: 20px !important; padding-right: 15px !important; }
+    [data-navitem] > span:nth-child(2) { display: none !important; }
+    [data-navitem] > span:first-child { font-size: 8.5px !important; }
+
+    /* The tagline wraps to three lines and collides with the chapter label under it.
+       The wordmark carries the brand on its own at this size. */
+    [data-tagline] { display: none !important; }
+    header { padding: 16px 16px !important; align-items: center !important; }
+    header a[href="#acquire"] { white-space: nowrap !important; }
+
+    /* 100vh is the LARGE viewport on iOS, so a fixed height leaves every chapter
+       taller than the visible area and shifting as the address bar retracts. Small
+       viewport units hold still, and auto height stops long copy from clipping. */
+    [data-chapter] {
+      height: auto !important;
+      min-height: 100svh !important;
+      padding-top: 96px !important;
+      padding-bottom: 104px !important;
+      padding-left: 18px !important;
+      padding-right: 42px !important;   /* clears the numeral rail so copy never runs under it */
+    }
+
+    /* Chapter 02 is right-aligned against the desktop composition; at this width
+       that reads as a mistake rather than a counterpoint. */
+    [data-chapter="2"] { justify-content: flex-start !important; }
+    [data-chapter="2"] > div { text-align: left !important; justify-items: start !important; }
+
+    /* Three short figures fit one row; auto-fit was breaking them to a ragged second. */
+    [data-chapter="1"] dl { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
+    [data-chapter="1"] dl dd { font-size: 20px !important; }
+
+    /* "START TOUR" was wrapping inside its own pill. */
+    [data-tourbar] { gap: 6px !important; padding: 7px 10px !important; }
+    [data-tourbar] button, [data-tourbar] span { white-space: nowrap !important; }
+
+    /* The stage gradient is angled for a left-aligned desktop column; in portrait it
+       eats the frame sideways. Darken top and bottom instead, so type stays legible
+       and the film is visible through the middle. */
+    [data-stage] > div:nth-of-type(2) {
+      background: linear-gradient(180deg, rgba(28,28,30,.86) 0%, rgba(28,28,30,.34) 30%,
+                                          rgba(28,28,30,.34) 62%, rgba(28,28,30,.88) 100%) !important;
+    }
+  }
+
+  /* Fallback for engines without small-viewport units: keep auto height so copy
+     cannot clip, even though the address-bar shift remains. */
+  @media (max-width: 700px) {
+    @supports not (height: 100svh) {
+      [data-chapter] { min-height: 100vh !important; }
+    }
+  }
 </style>
 </helmet>
 
@@ -54,7 +118,7 @@
   <header style="position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:flex-start;padding:22px clamp(16px,3vw,40px);pointer-events:none">
     <div style="display:flex;flex-direction:column;gap:6px;pointer-events:auto">
       <span style="font-family:'Bodoni Moda',serif;font-weight:400;font-size:22px;letter-spacing:.34em;line-height:1">INTIA</span>
-      <span style="font-size:9px;letter-spacing:.26em;color:rgba(246,242,236,.5)">SCENTUAL HAIR CARE · WHERE RADIANCE WHISPERS</span>
+      <span data-tagline="" style="font-size:9px;letter-spacing:.26em;color:rgba(246,242,236,.5)">SCENTUAL HAIR CARE · WHERE RADIANCE WHISPERS</span>
     </div>
     <div style="display:flex;gap:18px;align-items:center;pointer-events:auto">
       <a href="#acquire" style="font-size:10px;letter-spacing:.24em;color:rgba(246,242,236,.72)">THE PERFUME</a>
@@ -189,7 +253,7 @@
     </section>
   </main>
 
-  <div style="position:fixed;left:50%;transform:translateX(-50%);bottom:clamp(10px,2vh,22px);z-index:45;display:flex;gap:8px;align-items:center;max-width:calc(100vw - 32px);background:rgba(28,28,30,.7);border:1px solid rgba(224,189,174,.24);border-radius:999px;padding:8px 12px;backdrop-filter:blur(9px)">
+  <div data-tourbar="" style="position:fixed;left:50%;transform:translateX(-50%);bottom:clamp(10px,2vh,22px);z-index:45;display:flex;gap:8px;align-items:center;max-width:calc(100vw - 32px);background:rgba(28,28,30,.7);border:1px solid rgba(224,189,174,.24);border-radius:999px;padding:8px 12px;backdrop-filter:blur(9px)">
     <button type="button" onClick="{{ toggleTour }}" style="background:none;border:0;color:#f6f2ec;font-size:10px;letter-spacing:.22em;cursor:pointer;padding:4px 6px">{{ tourLabel }}</button>
     <span aria-hidden="true" style="width:1px;height:14px;background:rgba(224,189,174,.24)"></span>
     <span ref="{{ tourPctRef }}" aria-hidden="true" style="font-size:10px;letter-spacing:.14em;color:rgba(246,242,236,.6);min-width:40px;text-align:right">0%</span>
