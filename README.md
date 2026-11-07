@@ -2,7 +2,7 @@
 
 Scroll-driven landing page for **INTIA Aura — The Perfume**, a 50 ml hair perfume and the first product of INTIA's *Line 01 Scentual Longevity*.
 
-The page is one continuous film of a perfume droplet: scrolling moves the playhead, and five chapters of copy (notes, ingredients, how to use) ride on top of it.
+The page is one continuous film of a perfume droplet: scrolling moves the playhead, and six chapters of copy (notes, ingredients, how to use) ride on top of it.
 
 ## How it works
 
