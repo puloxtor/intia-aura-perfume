@@ -16,11 +16,6 @@
   [headers.values]
     Cache-Control = "public, max-age=604800"
 
-[[headers]]
-  for = "/uploads/*"
-  [headers.values]
-    Cache-Control = "public, max-age=604800"
-
 # The design system lives under a UUID-versioned path, so it genuinely never changes in place.
 [[headers]]
   for = "/_ds/*"
